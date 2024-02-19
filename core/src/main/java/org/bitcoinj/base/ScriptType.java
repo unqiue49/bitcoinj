@@ -31,28 +31,20 @@ import java.util.Optional;
  * @see <a href="https://github.com/bitcoin/bips/blob/master/bip-0382.mediawiki">BIP 382: Segwit Output Script Descriptors</a>
  */
 public enum ScriptType {
-    P2PKH("pkh", 1),    // pay to pubkey hash (aka pay to address)
-    P2PK("pk", 2),      // pay to pubkey
-    P2SH("sh", 3),      // pay to script hash
-    P2WPKH("wpkh", 4),  // pay to witness pubkey hash
-    P2WSH("wsh", 5),    // pay to witness script hash
-    P2TR("tr", 6);      // pay to taproot
+    P2PKH("pkh"),    // pay to pubkey hash (aka pay to address)
+    P2PK("pk"),      // pay to pubkey
+    P2SH("sh"),      // pay to script hash
+    P2WPKH("wpkh"),  // pay to witness pubkey hash
+    P2WSH("wsh"),    // pay to witness script hash
+    P2TR("tr");      // pay to taproot
 
     private final String scriptIdentifierString;
 
     /**
-     * @deprecated Use {@link #numericId()} or better yet use {@link #id()} to get a script identifier string
-     */
-    @Deprecated
-    public final int id;
-
-    /**
      * @param id script identifier string
-     * @param numericId numeric id for (temporary?) backward-compatibility
      */
-    ScriptType(String id, int numericId) {
+    ScriptType(String id) {
         this.scriptIdentifierString = id;
-        this.id = numericId;
     }
 
     /**
@@ -88,13 +80,4 @@ public enum ScriptType {
         return scriptIdentifierString;
     }
 
-    /**
-     * This is deprecated. But less deprecated than accessing the {@link #id} field directly.
-     * @return A numeric ID
-     * @deprecated Using {@link #id()} to get a script identifier string is preferred.
-     */
-    @Deprecated
-    public int numericId() {
-        return id;
-    }
 }

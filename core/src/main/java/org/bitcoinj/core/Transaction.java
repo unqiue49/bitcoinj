@@ -24,7 +24,6 @@ import org.bitcoinj.base.Coin;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.base.Sha256Hash;
 import org.bitcoinj.base.VarInt;
-import org.bitcoinj.base.internal.Buffers;
 import org.bitcoinj.base.internal.TimeUtils;
 import org.bitcoinj.core.LockTime.HeightLock;
 import org.bitcoinj.core.LockTime.TimeLock;
@@ -44,6 +43,7 @@ import org.bitcoinj.signers.TransactionSigner;
 import org.bitcoinj.utils.ExchangeRate;
 import org.bitcoinj.wallet.Wallet;
 import org.bitcoinj.wallet.WalletTransaction.Pool;
+import org.eclipse.collections.impl.list.mutable.FastList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,7 +56,6 @@ import java.math.RoundingMode;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
@@ -284,7 +283,7 @@ public class Transaction extends BaseMessage {
                 tx.readInputs(payload);
                 tx.readOutputs(payload);
             } else {
-                tx.outputs = new ArrayList<>(0);
+                tx.outputs = new FastList<>(0);
             }
         } else {
             // We read non-empty inputs. Assume normal outputs follows.
@@ -317,8 +316,8 @@ public class Transaction extends BaseMessage {
     public Transaction() {
         this.protocolVersion = ProtocolVersion.CURRENT.intValue();
         version = 1;
-        inputs = new ArrayList<>();
-        outputs = new ArrayList<>();
+        inputs = new FastList<>();
+        outputs = new FastList<>();
         // We don't initialize appearsIn deliberately as it's only useful for transactions stored in the wallet.
         vLockTime = LockTime.unset();
     }
@@ -633,7 +632,7 @@ public class Transaction extends BaseMessage {
         VarInt numInputsVarInt = VarInt.read(payload);
         check(numInputsVarInt.fitsInt(), BufferUnderflowException::new);
         int numInputs = numInputsVarInt.intValue();
-        inputs = new ArrayList<>(Math.min((int) numInputs, Utils.MAX_INITIAL_ARRAY_LENGTH));
+        inputs = new FastList<>(Math.min((int) numInputs, Utils.MAX_INITIAL_ARRAY_LENGTH));
         for (long i = 0; i < numInputs; i++) {
             inputs.add(TransactionInput.read(payload, this));
         }
@@ -643,7 +642,7 @@ public class Transaction extends BaseMessage {
         VarInt numOutputsVarInt = VarInt.read(payload);
         check(numOutputsVarInt.fitsInt(), BufferUnderflowException::new);
         int numOutputs = numOutputsVarInt.intValue();
-        outputs = new ArrayList<>(Math.min((int) numOutputs, Utils.MAX_INITIAL_ARRAY_LENGTH));
+        outputs = new FastList<>(Math.min((int) numOutputs, Utils.MAX_INITIAL_ARRAY_LENGTH));
         for (long i = 0; i < numOutputs; i++) {
             outputs.add(TransactionOutput.read(payload, this));
         }
@@ -1214,7 +1213,7 @@ public class Transaction extends BaseMessage {
 
             if ((sigHashType & 0x1f) == SigHash.NONE.value) {
                 // SIGHASH_NONE means no outputs are signed at all - the signature is effectively for a "blank cheque".
-                tx.outputs = new ArrayList<>(0);
+                tx.outputs = new FastList<>(0);
                 // The signature isn't broken by new versions of the transaction issued by other parties.
                 for (int i = 0; i < tx.inputs.size(); i++)
                     if (i != inputIndex)
@@ -1234,7 +1233,7 @@ public class Transaction extends BaseMessage {
                 }
                 // In SIGHASH_SINGLE the outputs after the matching input index are deleted, and the outputs before
                 // that position are "nulled out". Unintuitively, the value in a "null" transaction is set to -1.
-                tx.outputs = new ArrayList<>(tx.outputs.subList(0, inputIndex + 1));
+                tx.outputs = new FastList<>(tx.outputs.subList(0, inputIndex + 1));
                 for (int i = 0; i < inputIndex; i++)
                     tx.outputs.set(i, new TransactionOutput(tx, Coin.NEGATIVE_SATOSHI, new byte[] {}));
                 // The signature isn't broken by new versions of the transaction issued by other parties.
@@ -1246,7 +1245,7 @@ public class Transaction extends BaseMessage {
             if ((sigHashType & SigHash.ANYONECANPAY.value) == SigHash.ANYONECANPAY.value) {
                 // SIGHASH_ANYONECANPAY means the signature in the input is not broken by changes/additions/removals
                 // of other inputs. For example, this is useful for building assurance contracts.
-                tx.inputs = new ArrayList<>();
+                tx.inputs = new FastList<>();
                 tx.inputs.add(input);
             }
 
@@ -1434,7 +1433,7 @@ public class Transaction extends BaseMessage {
     }
 
     @Override
-    protected void bitcoinSerializeToStream(OutputStream stream) throws IOException {
+    public void bitcoinSerializeToStream(OutputStream stream) throws IOException {
         boolean useSegwit = hasWitnesses() && allowWitness(protocolVersion);
         bitcoinSerializeToStream(stream, useSegwit);
     }
@@ -1654,7 +1653,7 @@ public class Transaction extends BaseMessage {
     /** Loops the outputs of a coinbase transaction to locate the witness commitment. */
     public Sha256Hash findWitnessCommitment() {
         checkState(isCoinBase());
-        List<TransactionOutput> reversed = new ArrayList<>(outputs);
+        List<TransactionOutput> reversed = new FastList<>(outputs);
         Collections.reverse(reversed);
         return reversed.stream()
                         .map(TransactionOutput::getScriptPubKey)

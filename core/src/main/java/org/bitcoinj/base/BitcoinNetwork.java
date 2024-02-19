@@ -38,6 +38,7 @@ import static org.bitcoinj.base.Coin.COIN;
  * method for input of network values.
  */
 public enum BitcoinNetwork implements Network {
+    UNKNOWN("unknown"),
     /** The main Bitcoin network, known as {@code "mainnet"}, with {@code id} string {@code "org.bitcoin.production"}  */
     MAINNET("org.bitcoin.production", "main", "prod"),
     /** The Bitcoin test network, known as {@code "testnet"}, with {@code id} string {@code "org.bitcoin.test"}  */

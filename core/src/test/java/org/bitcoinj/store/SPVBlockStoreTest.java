@@ -38,7 +38,6 @@ import org.junit.Test;
 import java.io.File;
 import java.math.BigInteger;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.Collections;
 
 import static org.junit.Assert.assertEquals;

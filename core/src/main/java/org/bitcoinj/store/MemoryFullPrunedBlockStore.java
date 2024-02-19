@@ -356,7 +356,7 @@ public class MemoryFullPrunedBlockStore implements FullPrunedBlockStore {
     }
     
     @Override
-    public void close() {
+    public void close() throws BlockStoreException {
         blockMap = null;
         fullBlockMap = null;
         transactionOutputMap = null;

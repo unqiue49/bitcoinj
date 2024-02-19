@@ -29,10 +29,10 @@ import org.bitcoinj.base.internal.TimeUtils;
 import org.bitcoinj.base.internal.ByteUtils;
 import org.bitcoinj.base.internal.InternalUtils;
 import org.bitcoinj.crypto.ECKey;
-import org.bitcoinj.params.BitcoinNetworkParams;
 import org.bitcoinj.script.Script;
 import org.bitcoinj.script.ScriptBuilder;
 import org.bitcoinj.script.ScriptOpCodes;
+import org.eclipse.collections.impl.list.mutable.FastList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,7 +46,6 @@ import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.EnumSet;
@@ -204,7 +203,7 @@ public class Block extends BaseMessage {
         this.difficultyTarget = difficultyTarget;
         this.nonce = nonce;
         this.prevBlockHash = Sha256Hash.ZERO_HASH;
-        this.transactions = new ArrayList<>(Objects.requireNonNull(transactions));
+        this.transactions = new FastList<>(Objects.requireNonNull(transactions));
     }
 
     /**
@@ -227,7 +226,7 @@ public class Block extends BaseMessage {
         this.difficultyTarget = difficultyTarget;
         this.nonce = nonce;
         this.transactions = transactions != null ?
-                new ArrayList<>(transactions) :
+                new FastList<>(transactions) :
                 null;
     }
 
@@ -315,6 +314,13 @@ public class Block extends BaseMessage {
     protected void bitcoinSerializeToStream(OutputStream stream) throws IOException {
         writeHeader(stream);
         writeTransactions(stream);
+    }
+
+    public void unCacheBlock() {
+        if (this.transactions != null) {
+            this.transactions.clear();
+            this.transactions = null;
+        }
     }
 
     protected void unCache() {
@@ -589,7 +595,7 @@ public class Block extends BaseMessage {
         //    2     3    4  4
         //  / \   / \   / \
         // t1 t2 t3 t4 t5 t5
-        ArrayList<Sha256Hash> tree = new ArrayList<>(transactions.size());
+        FastList<Sha256Hash> tree = new FastList<>(transactions.size());
         // Start by adding all the hashes of the transactions as leaves of the tree.
         for (Transaction tx : transactions) {
             final Sha256Hash hash;
@@ -691,7 +697,7 @@ public class Block extends BaseMessage {
     void addTransaction(Transaction t, boolean runSanityChecks) {
         unCacheTransactions();
         if (transactions == null) {
-            transactions = new ArrayList<>();
+            transactions = new FastList<>();
         }
         if (runSanityChecks && transactions.size() == 0 && !t.isCoinBase())
             throw new RuntimeException("Attempted to add a non-coinbase transaction as the first transaction: " + t);
@@ -811,7 +817,7 @@ public class Block extends BaseMessage {
     // For testing only
     void addCoinbaseTransaction(byte[] pubKeyTo, Coin value, final int height) {
         unCacheTransactions();
-        transactions = new ArrayList<>();
+        transactions = new FastList<>();
         Transaction coinbase = new Transaction();
         final ScriptBuilder inputBuilder = new ScriptBuilder();
 

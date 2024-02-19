@@ -503,7 +503,13 @@ public class FullPrunedBlockChain extends AbstractBlockChain {
     @Override
     protected StoredBlock getStoredBlockInCurrentScope(Sha256Hash hash) throws BlockStoreException {
         checkState(lock.isHeldByCurrentThread());
-        return blockStore.getOnceUndoableStoredBlock(hash);
+        StoredBlock topChainBlock = blockStore.getVerifiedChainHead();
+        if (topChainBlock.getHeader().getHash().equals(hash)) {
+            return topChainBlock;
+        } else {
+            return null;
+        }
+//        return blockStore.getOnceUndoableStoredBlock(hash);
     }
 
     private Coin getBlockInflation(int height) {

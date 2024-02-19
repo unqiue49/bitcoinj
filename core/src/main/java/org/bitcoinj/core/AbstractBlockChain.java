@@ -452,7 +452,12 @@ public abstract class AbstractBlockChain {
      * @return true if we are verifying all transactions
      */
     protected abstract boolean shouldVerifyTransactions();
-    
+
+
+    protected boolean isImportBlocks() {
+        return shouldVerifyTransactions();
+    }
+
     /**
      * Connect each transaction in block.transactions, verifying them as we go and removing spent outputs
      * If an error is encountered in a transaction, no changes should be made to the underlying BlockStore.
@@ -499,12 +504,12 @@ public abstract class AbstractBlockChain {
                 throw new VerificationException("Difficulty target is out of range: " + target.toString());
 
             // If we want to verify transactions (ie we are running with full blocks), verify that block has transactions
-            if (shouldVerifyTransactions() && block.getTransactions() == null)
+            if (!isImportBlocks() && block.getTransactions() == null)
                 throw new VerificationException("Got a block header while running in full-block mode");
 
             // Check for already-seen block, but only for full pruned mode, where the DB is
             // more likely able to handle these queries quickly.
-            if (shouldVerifyTransactions() && blockStore.get(block.getHash()) != null) {
+            if (!isImportBlocks() && blockStore.get(block.getHash()) != null) {
                 return true;
             }
 
@@ -525,7 +530,7 @@ public abstract class AbstractBlockChain {
                     height = Block.BLOCK_HEIGHT_UNKNOWN;
                 }
                 flags = params.getBlockVerificationFlags(block, versionTally, height);
-                if (shouldVerifyTransactions())
+                if (!isImportBlocks())
                     Block.verifyTransactions(params, block, height, flags);
             } catch (VerificationException e) {
                 log.error("Failed to verify block: ", e);
@@ -543,14 +548,14 @@ public abstract class AbstractBlockChain {
                         "bug in tryConnectingOrphans");
                 log.warn("Block does not connect: {} prev {}", block.getHashAsString(), block.getPrevBlockHash());
                 orphanBlocks.put(block.getHash(), new OrphanBlock(block, filteredTxHashList, filteredTxn));
-                if (tryConnecting)
-                    tryConnectingOrphans();
+                tryConnectingOrphans();
                 return false;
             } else {
                 checkState(lock.isHeldByCurrentThread());
                 // It connects to somewhere on the chain. Not necessarily the top of the best known chain.
                 params.checkDifficultyTransitions(storedPrev, block, blockStore);
                 connectBlock(block, storedPrev, shouldVerifyTransactions(), filteredTxHashList, filteredTxn);
+                block.unCacheBlock();
                 if (tryConnecting)
                     tryConnectingOrphans();
                 return true;
@@ -617,12 +622,17 @@ public abstract class AbstractBlockChain {
                 }
             }
 
-            // This block connects to the best known block, it is a normal continuation of the system.
-            TransactionOutputChanges txOutChanges = null;
-            if (shouldVerifyTransactions())
-                txOutChanges = connectTransactions(storedPrev.getHeight() + 1, block);
-            StoredBlock newStoredBlock = addToBlockStore(storedPrev,
-                    block.getTransactions() == null ? block : block.cloneAsHeader(), txOutChanges);
+            StoredBlock newStoredBlock;
+            if (isImportBlocks()) {
+                newStoredBlock = addToBlockStore(storedPrev, block);
+            } else {
+                // This block connects to the best known block, it is a normal continuation of the system.
+                TransactionOutputChanges txOutChanges = null;
+                if (shouldVerifyTransactions())
+                    txOutChanges = connectTransactions(storedPrev.getHeight() + 1, block);
+                newStoredBlock = addToBlockStore(storedPrev,
+                        block.getTransactions() == null ? block : block.cloneAsHeader(), txOutChanges);
+            }
             versionTally.add(block.getVersion());
             setChainHead(newStoredBlock);
             if (log.isDebugEnabled())

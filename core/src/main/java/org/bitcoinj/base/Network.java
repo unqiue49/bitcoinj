@@ -71,4 +71,6 @@ public interface Network {
      * @return true if too big, false if an allowed amount
      */
     boolean exceedsMaxMoney(Monetary monetary);
+
+    int ordinal();
 }

@@ -63,6 +63,10 @@ public class StoredUndoableBlock {
     public List<Transaction> getTransactions() {
         return transactions;
     }
+
+    public void setTransactions(List<Transaction> transactions) {
+        this.transactions = transactions;
+    }
     
     /**
      * Get the hash of the represented block

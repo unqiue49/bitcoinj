@@ -63,4 +63,10 @@ public class MockAltNetwork implements Network {
     public boolean exceedsMaxMoney(Monetary monetary) {
         return false;
     }
+
+    @Override
+    public int ordinal() {
+        return -1;
+    }
+
 }

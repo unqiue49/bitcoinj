@@ -73,7 +73,7 @@ public class MemoryBlockStore implements BlockStore {
     }
     
     @Override
-    public void close() {
+    public void close() throws BlockStoreException {
         blockMap = null;
     }
 }

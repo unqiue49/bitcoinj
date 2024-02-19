@@ -51,16 +51,12 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.nio.channels.FileLock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import static org.bitcoinj.base.internal.Preconditions.checkState;
