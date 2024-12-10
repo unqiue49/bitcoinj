@@ -21,7 +21,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Iterators;
 import org.bitcoinj.base.Sha256Hash;
 import org.bitcoinj.base.internal.TimeUtils;
-import org.bitcoinj.utils.ListenableCompletableFuture;
 import org.bitcoinj.utils.ListenerRegistration;
 import org.bitcoinj.utils.Threading;
 import org.bitcoinj.wallet.CoinSelector;
@@ -30,12 +29,12 @@ import org.bitcoinj.wallet.Wallet;
 import javax.annotation.Nullable;
 import java.time.Instant;
 import java.util.Collections;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
 
@@ -112,7 +111,7 @@ public class TransactionConfidence {
         /**
          * If DEAD, then it means the transaction won't confirm unless there is another re-org,
          * because some other transaction is spending one of its inputs. Such transactions should be alerted to the user
-         * so they can take action, eg, suspending shipment of goods if they are a merchant.
+         * so they can take action, e.g., suspending shipment of goods if they are a merchant.
          * It can also mean that a coinbase transaction has been made dead from it being moved onto a side chain.
          */
         DEAD(4),
@@ -343,15 +342,8 @@ public class TransactionConfidence {
      * Return the time the transaction was last announced to us, or empty if unknown.
      * @return time the transaction was last announced to us, or empty if unknown
      */
-    public Optional<Instant> lastBroadcastTime() {
+    public Optional<Instant> getLastBroadcastTime() {
         return Optional.ofNullable(lastBroadcastTime);
-    }
-
-    /** @deprecated use {@link #lastBroadcastTime()} */
-    @Deprecated
-    @Nullable
-    public Date getLastBroadcastedAt() {
-        return lastBroadcastTime != null ? Date.from(lastBroadcastTime) : null;
     }
 
     /**
@@ -360,12 +352,6 @@ public class TransactionConfidence {
      */
     public void setLastBroadcastTime(Instant lastBroadcastTime) {
         this.lastBroadcastTime = Objects.requireNonNull(lastBroadcastTime);
-    }
-
-    /** @deprecated use {@link #setLastBroadcastTime(Instant)} */
-    @Deprecated
-    public void setLastBroadcastedAt(Date lastBroadcastedAt) {
-        setLastBroadcastTime(lastBroadcastedAt.toInstant());
     }
 
     @Override
@@ -549,8 +535,8 @@ public class TransactionConfidence {
      * depth to one will wait until it appears in a block on the best chain, and zero will wait until it has been seen
      * on the network.
      */
-    private synchronized ListenableCompletableFuture<TransactionConfidence> getDepthFuture(final int depth, Executor executor) {
-        final ListenableCompletableFuture<TransactionConfidence> result = new ListenableCompletableFuture<>();
+    private synchronized CompletableFuture<TransactionConfidence> getDepthFuture(final int depth, Executor executor) {
+        final CompletableFuture<TransactionConfidence> result = new CompletableFuture<>();
         if (getDepthInBlocks() >= depth) {
             result.complete(this);
         }
@@ -565,7 +551,7 @@ public class TransactionConfidence {
         return result;
     }
 
-    public synchronized ListenableCompletableFuture<TransactionConfidence> getDepthFuture(final int depth) {
+    public synchronized CompletableFuture<TransactionConfidence> getDepthFuture(final int depth) {
         return getDepthFuture(depth, Threading.USER_THREAD);
     }
 

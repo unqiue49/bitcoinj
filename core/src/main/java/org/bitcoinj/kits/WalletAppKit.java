@@ -24,7 +24,6 @@ import org.bitcoinj.base.ScriptType;
 import org.bitcoinj.base.internal.PlatformUtils;
 import org.bitcoinj.core.BlockChain;
 import org.bitcoinj.core.CheckpointManager;
-import org.bitcoinj.core.Context;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.PeerAddress;
 import org.bitcoinj.core.PeerGroup;
@@ -110,25 +109,6 @@ public class WalletAppKit extends AbstractIdleService implements Closeable {
     @Nullable protected DeterministicSeed restoreFromSeed;
     @Nullable protected DeterministicKey restoreFromKey;
     @Nullable protected PeerDiscovery discovery;
-
-    /**
-     * Creates a new WalletAppKit, with a newly created {@link Context}. Files will be stored in the given directory.
-     * @deprecated Use {@link #WalletAppKit(BitcoinNetwork, ScriptType, KeyChainGroupStructure, File, String)}
-     */
-    @Deprecated
-    public WalletAppKit(NetworkParameters params, File directory, String filePrefix) {
-        this((BitcoinNetwork) params.network(), ScriptType.P2PKH, KeyChainGroupStructure.BIP32, directory, filePrefix);
-    }
-
-    /**
-     * Creates a new WalletAppKit, with a newly created {@link Context}. Files will be stored in the given directory.
-     * @deprecated Use {@link #WalletAppKit(BitcoinNetwork, ScriptType, KeyChainGroupStructure, File, String)}
-     */
-    @Deprecated
-    public WalletAppKit(NetworkParameters params, ScriptType preferredOutputScriptType,
-            @Nullable KeyChainGroupStructure structure, File directory, String filePrefix) {
-        this((BitcoinNetwork) params.network(), preferredOutputScriptType, structure, directory, filePrefix);
-    }
 
     /**
      * Creates a new WalletAppKit, on the specified {@link BitcoinNetwork}. Files will be stored in the given directory.
@@ -405,13 +385,13 @@ public class WalletAppKit extends AbstractIdleService implements Closeable {
                 // Initialize the chain file with a checkpoint to speed up first-run sync.
                 Instant time;
                 if (restoreFromSeed != null) {
-                    time = restoreFromSeed.creationTime().orElse(Instant.EPOCH);
+                    time = restoreFromSeed.getCreationTime().orElse(Instant.EPOCH);
                     if (chainFileExists) {
                         log.info("Clearing the chain file in preparation for restore.");
                         vStore.clear();
                     }
                 } else if (restoreFromKey != null) {
-                    time = restoreFromKey.creationTime().orElse(Instant.EPOCH);
+                    time = restoreFromKey.getCreationTime().orElse(Instant.EPOCH);
                     if (chainFileExists) {
                         log.info("Clearing the chain file in preparation for restore.");
                         vStore.clear();

@@ -27,7 +27,6 @@ import org.bitcoinj.base.SegwitAddress;
 import org.bitcoinj.base.Sha256Hash;
 import org.bitcoinj.base.internal.TimeUtils;
 import org.bitcoinj.base.internal.ByteUtils;
-import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.base.VarInt;
 import org.bitcoinj.crypto.internal.CryptoUtils;
 import org.bitcoinj.crypto.utils.MessageVerifyUtils;
@@ -91,7 +90,7 @@ import static org.bitcoinj.base.internal.Preconditions.checkState;
  *
  * <p>ECKey also provides access to Bitcoin Core compatible text message signing, as accessible via the UI or JSON-RPC.
  * This is slightly different to signing raw bytes - if you want to sign your own data and it won't be exposed as
- * text to people, you don't want to use this. If in doubt, ask on the mailing list.</p>
+ * text to people, you don't want to use this.</p>
  *
  * <p>The ECDSA algorithm supports <i>key recovery</i> in which a signature plus a couple of discriminator bits can
  * be reversed to find the public key used to calculate it. This can be convenient when you have a message and a
@@ -117,7 +116,7 @@ public class ECKey implements EncryptableItem {
     private static final Comparator<byte[]> LEXICOGRAPHICAL_COMPARATOR = ByteUtils.arrayUnsignedComparator();
 
     /** Sorts oldest keys first, newest last. */
-    public static final Comparator<ECKey> AGE_COMPARATOR = Comparator.comparing(ecKey -> ecKey.creationTime().orElse(Instant.EPOCH));
+    public static final Comparator<ECKey> AGE_COMPARATOR = Comparator.comparing(ecKey -> ecKey.getCreationTime().orElse(Instant.EPOCH));
 
     /** Compares by extracting pub key as a {@code byte[]} and using a lexicographic comparator */
     public static final Comparator<ECKey> PUBKEY_COMPARATOR = Comparator.comparing(ECKey::getPubKey, LEXICOGRAPHICAL_COMPARATOR);
@@ -126,13 +125,23 @@ public class ECKey implements EncryptableItem {
     private static final X9ECParameters CURVE_PARAMS = CustomNamedCurves.getByName("secp256k1");
 
     /** The parameters of the secp256k1 curve that Bitcoin uses. */
-    public static final ECDomainParameters CURVE;
+    static final ECDomainParameters CURVE;
+
+    /**
+     * Return EC parameters for the SECP256K1 curve, in a Bouncy Castle type.
+     * Note that we are migrating to using the build in JDK types for EC parameters,
+     * so we anticipate this method will be deprecated in the near future.
+     * @return Elliptic Curve Domain Parameters (Bouncy Castle)
+     */
+    public static ECDomainParameters ecDomainParameters() {
+        return CURVE;
+    }
 
     /**
      * Equal to CURVE.getN().shiftRight(1), used for canonicalising the S value of a signature. If you aren't
      * sure what this is about, you can ignore it.
      */
-    public static final BigInteger HALF_CURVE_ORDER;
+    static final BigInteger HALF_CURVE_ORDER;
 
     private static final SecureRandom secureRandom;
 
@@ -259,7 +268,7 @@ public class ECKey implements EncryptableItem {
     public static ECKey fromPrivateAndPrecalculatedPublic(byte[] priv, byte[] pub) {
         Objects.requireNonNull(priv);
         Objects.requireNonNull(pub);
-        return new ECKey(ByteUtils.bytesToBigInteger(priv), new LazyECPoint(CURVE.getCurve(), pub));
+        return new ECKey(ByteUtils.bytesToBigInteger(priv), new LazyECPoint(pub));
     }
 
     /**
@@ -275,7 +284,7 @@ public class ECKey implements EncryptableItem {
      * The compression state of pub will be preserved.
      */
     public static ECKey fromPublicOnly(byte[] pub) {
-        return new ECKey(null, new LazyECPoint(CURVE.getCurve(), pub));
+        return new ECKey(null, new LazyECPoint(pub));
     }
 
     public static ECKey fromPublicOnly(ECKey key) {
@@ -549,7 +558,7 @@ public class ECKey implements EncryptableItem {
 
     /**
      * Signs the given hash and returns the R and S components as BigIntegers. In the Bitcoin protocol, they are
-     * usually encoded using ASN.1 format, so you want {@link ECKey.ECDSASignature#toASN1()}
+     * usually encoded using ASN.1 format, so you want {@link ECKey#toASN1()}
      * instead. However sometimes the independent components can be useful, for instance, if you're going to do
      * further EC maths on them.
      * @throws KeyCrypterException if this ECKey doesn't have a private part.
@@ -796,7 +805,7 @@ public class ECKey implements EncryptableItem {
         byte[] data = formatMessageForSigning(message);
         Sha256Hash hash = Sha256Hash.twiceOf(data);
         ECDSASignature sig = sign(hash, aesKey);
-        byte recId = findRecoveryId(hash, sig);
+        byte recId = findRecoveryId(hash, sig); // for detailed explanation of recId see recoverFromSignature()
 
         // Meaning of header byte ranges:
         //  * 27-30: P2PKH uncompressed, recId 0-3
@@ -890,6 +899,7 @@ public class ECKey implements EncryptableItem {
         // keys was the key used to create the signature (see also BIP 137):
         // header byte:  27 = first key with even y,  28 = first key with odd y,
         //               29 = second key with even y, 30 = second key with odd y
+        // (for detailed explanation of recId see recoverFromSignature() )
         int recId = header - 27;
         ECKey key = ECKey.recoverFromSignature(recId, sig, messageHash, compressed);
         if (key == null)
@@ -945,7 +955,7 @@ public class ECKey implements EncryptableItem {
      * <p>Given the above two points, a correct usage of this method is inside a for loop from 0 to 3, and if the
      * output is null OR a key that is not the one you expect, you try again with the next recId.</p>
      *
-     * @param recId Which possible key to recover.
+     * @param recId Which possible key to recover (see inline comments for detailed explanation)
      * @param sig the R and S components of the signature, wrapped.
      * @param message Hash of the data that was signed.
      * @param compressed Whether or not the original pubkey was compressed.
@@ -961,8 +971,27 @@ public class ECKey implements EncryptableItem {
         // 1.0 For j from 0 to h   (h == recId here and the loop is outside this function)
         //   1.1 Let x = r + jn
         BigInteger n = CURVE.getN();  // Curve order.
+
+        // The value r in the signature (r,s) is the x-coordinate mod n of the point R
+        // R is the public key of k (the nonce used when creating the signature)
+        //
+        // There are now 4 possible matching public keys R (the pubkey from the nonce k), indicated by recId:
+        //
+        // - recId 0: x-coordinate of R was smaller than n, the y-coordinate of R was even
+        // - recId 1: x-coordinate of R was smaller than n, the y-coordinate of R was odd
+        // - recId 2: x-coordinate of R was greater than n (but smaller than p), the y-coordinate of R was even
+        // - recId 3: x-coordinate of R was greater than n (but smaller than p), the y-coordinate of R was odd
+        //
+        // Keep in mind, that the value r was taken "mod n" (n = order of the curve) but the valid range for
+        // coordinate values of points is 0 to p-1 (p being the prime of the prime field Fp which is larger than n).
+        // So if the x-coordinate originally was >n, we need to add n to r here again to get the original value.
+
+        // But it is very very unlikely (but not impossible) to ever see recId 2 or 3, because
+        // n is almost as large as p in secp256k1.
+        // The chances to ever see this are 1 to 2.677 * 10^38  ( 1 to n/(p-n) )
+
         BigInteger i = BigInteger.valueOf((long) recId / 2);
-        BigInteger x = sig.r.add(i.multiply(n));
+        BigInteger x = sig.r.add(i.multiply(n)); // if the original x was >n, add n here again (to undo the mod n)
         //   1.2. Convert the integer x to an octet string X of length mlen using the conversion routine
         //        specified in Section 2.3.7, where mlen = ⌈(log2 p)/8⌉ or mlen = ⌈m/8⌉.
         //   1.3. Convert the octet string (16 set binary digits)||X to an elliptic curve point R using the
@@ -977,7 +1006,7 @@ public class ECKey implements EncryptableItem {
         }
         // Compressed keys require you to know an extra bit of data about the y-coord as there are two possibilities.
         // So it's encoded in the recId.
-        ECPoint R = decompressKey(x, (recId & 1) == 1);
+        ECPoint R = decompressKey(x, (recId & 1) == 1); // even recId means even y, odd recId means odd y
         //   1.4. If nR != point at infinity, then do another iteration of Step 1 (callers responsibility).
         if (!R.multiply(n).isInfinity())
             return null;
@@ -1002,7 +1031,16 @@ public class ECKey implements EncryptableItem {
         return ECKey.fromPublicOnly(q, compressed);
     }
 
-    /** Decompress a compressed public key (x co-ord and low-bit of y-coord). */
+    /**
+     * Decompress a compressed public key. With a given x-coordinate there are always (except for the point
+     * at infinity) two possible points on the curve with two different y-coordinates, an even one and an odd one.
+     * Therefore you have to specify if you want the point with the even or the odd y.
+     *
+     * @param xBN x-coordinate of the curve point
+     * @param yBit least significant bit of the y-coordinate to be used. If set to <code>true</code>,
+     *             the odd y coordinate will be used, if set to <code>false</code> the even y coordinate
+     *             will be used
+     */
     private static ECPoint decompressKey(BigInteger xBN, boolean yBit) {
         X9IntegerConverter x9 = new X9IntegerConverter();
         byte[] compEnc = x9.integerToBytes(xBN, 1 + x9.getByteLength(CURVE.getCurve()));
@@ -1031,25 +1069,11 @@ public class ECKey implements EncryptableItem {
     }
 
     /**
-     * Exports the private key in the form used by Bitcoin Core's "dumpprivkey" and "importprivkey" commands. Use
-     * the {@link DumpedPrivateKey#toString()} method to get the string.
-     *
-     * @param params The network this key is intended for use on.
-     * @return Private key bytes as a {@link DumpedPrivateKey}.
-     * @throws IllegalStateException if the private key is not available.
-     * @deprecated Use {@link #getPrivateKeyEncoded(Network)}
-     */
-    @Deprecated
-    public DumpedPrivateKey getPrivateKeyEncoded(NetworkParameters params) {
-        return getPrivateKeyEncoded(params.network());
-    }
-
-    /**
      * Returns the creation time of this key, or empty if the key was deserialized from a version that did not store
      * that data.
      */
     @Override
-    public Optional<Instant> creationTime() {
+    public Optional<Instant> getCreationTime() {
         return Optional.ofNullable(creationTime);
     }
 
@@ -1214,7 +1238,7 @@ public class ECKey implements EncryptableItem {
     }
 
     /**
-     * Returns the the encrypted private key bytes and initialisation vector for this ECKey, or null if the ECKey
+     * Returns the encrypted private key bytes and initialisation vector for this ECKey, or null if the ECKey
      * is not encrypted.
      */
     @Nullable
@@ -1266,16 +1290,6 @@ public class ECKey implements EncryptableItem {
         return toString(true, aesKey, network);
     }
 
-    /**
-     * Produce a string rendering of the ECKey INCLUDING the private key.
-     * Unless you absolutely need the private key it is better for security reasons to just use {@link #toString()}.
-     * @deprecated Use {@link #toStringWithPrivate(AesKey, Network)}
-     */
-    @Deprecated
-    public String toStringWithPrivate(@Nullable AesKey aesKey, NetworkParameters params) {
-        return toStringWithPrivate(aesKey, params.network());
-    }
-
     public String getPrivateKeyAsHex() {
         return ByteUtils.formatHex(getPrivKeyBytes());
     }
@@ -1287,14 +1301,6 @@ public class ECKey implements EncryptableItem {
 
     public String getPrivateKeyAsWiF(Network network) {
         return getPrivateKeyEncoded(network).toString();
-    }
-
-    /**
-     * @deprecated Use {@link #getPrivateKeyEncoded(Network)}
-     */
-    @Deprecated
-    public String getPrivateKeyAsWiF(NetworkParameters params) {
-        return getPrivateKeyAsWiF(params.network());
     }
 
     private String toString(boolean includePrivate, @Nullable AesKey aesKey, Network network) {
@@ -1322,16 +1328,6 @@ public class ECKey implements EncryptableItem {
         return helper.toString();
     }
 
-    /**
-     * @deprecated Use {@link #toString(boolean, AesKey, Network)}
-     */
-    @Deprecated
-    private String toString(boolean includePrivate, @Nullable AesKey aesKey, @Nullable NetworkParameters params) {
-        Network network = (params != null) ? params.network() : BitcoinNetwork.MAINNET;
-        return toString(includePrivate, aesKey, network);
-    }
-
-
     public void formatKeyWithAddress(boolean includePrivateKeys, @Nullable AesKey aesKey, StringBuilder builder,
                                      Network network, ScriptType outputScriptType, @Nullable String comment) {
         builder.append("  addr:");
@@ -1357,15 +1353,6 @@ public class ECKey implements EncryptableItem {
             builder.append(toStringWithPrivate(aesKey, network));
             builder.append("\n");
         }
-    }
-
-    /**
-     * @deprecated Use {@link #formatKeyWithAddress(boolean, AesKey, StringBuilder, Network, ScriptType, String)}
-     */
-    @Deprecated
-    public void formatKeyWithAddress(boolean includePrivateKeys, @Nullable AesKey aesKey, StringBuilder builder,
-                                     NetworkParameters params, ScriptType outputScriptType, @Nullable String comment) {
-        formatKeyWithAddress(includePrivateKeys, aesKey, builder, params.network(), outputScriptType, comment);
     }
 
     /** The string that prefixes all text messages signed using Bitcoin keys. */

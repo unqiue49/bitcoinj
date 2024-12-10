@@ -60,7 +60,6 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -399,7 +398,7 @@ public class WalletProtobufSerializer {
                     .build();
             confidenceBuilder.addBroadcastBy(proto);
         }
-        confidence.lastBroadcastTime().ifPresent(
+        confidence.getLastBroadcastTime().ifPresent(
                 lastBroadcastTime -> confidenceBuilder.setLastBroadcastedAt(lastBroadcastTime.toEpochMilli())
         );
         txBuilder.setConfidence(confidenceBuilder);
@@ -470,13 +469,6 @@ public class WalletProtobufSerializer {
     public Wallet readWallet(Network network, @Nullable WalletExtension[] extensions,
                              Protos.Wallet walletProto) throws UnreadableWalletException {
         return readWallet(network, extensions, walletProto, false);
-    }
-
-    /** @deprecated use {@link #readWallet(Network, WalletExtension[], Protos.Wallet)} */
-    @Deprecated
-    public Wallet readWallet(NetworkParameters params, @Nullable WalletExtension[] extensions,
-                             Protos.Wallet walletProto) throws UnreadableWalletException {
-        return readWallet(params.network(), extensions, walletProto);
     }
 
     /**
@@ -585,13 +577,6 @@ public class WalletProtobufSerializer {
         txMap.clear();
 
         return wallet;
-    }
-
-    /** @deprecated use {@link #readWallet(Network, WalletExtension[], Protos.Wallet, boolean)} */
-    @Deprecated
-    public Wallet readWallet(NetworkParameters params, @Nullable WalletExtension[] extensions,
-                             Protos.Wallet walletProto, boolean forceReset) throws UnreadableWalletException {
-        return readWallet(params.network(), extensions, walletProto, forceReset);
     }
 
     private void loadExtensions(Wallet wallet, WalletExtension[] extensionsList, Protos.Wallet walletProto) throws UnreadableWalletException {

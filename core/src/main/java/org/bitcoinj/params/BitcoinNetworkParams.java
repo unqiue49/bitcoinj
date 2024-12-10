@@ -42,7 +42,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.Temporal;
 import java.time.temporal.TemporalUnit;
-import java.util.concurrent.TimeUnit;
 
 import static org.bitcoinj.base.internal.Preconditions.checkState;
 
@@ -198,7 +197,7 @@ public abstract class BitcoinNetworkParams extends NetworkParameters {
             log.info("Difficulty transition traversal took {}", watch);
 
         Block blockIntervalAgo = cursor.getHeader();
-        int timespan = (int) (prev.getTimeSeconds() - blockIntervalAgo.getTimeSeconds());
+        int timespan = (int) (prev.time().getEpochSecond() - blockIntervalAgo.time().getEpochSecond());
         // Limit the adjustment step.
         final int targetTimespan = this.getTargetTimespan();
         if (timespan < targetTimespan / 4)

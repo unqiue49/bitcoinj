@@ -28,7 +28,6 @@ import org.bitcoinj.base.Coin;
 import org.bitcoinj.core.LockTime;
 import org.bitcoinj.crypto.ECKey;
 import org.bitcoinj.base.LegacyAddress;
-import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.ProtocolException;
 import org.bitcoinj.base.SegwitAddress;
 import org.bitcoinj.base.Sha256Hash;
@@ -224,10 +223,14 @@ public class Script {
     private final List<ScriptChunk> chunks;
     // Unfortunately, scripts are not ever re-serialized or canonicalized when used in signature hashing. Thus we
     // must preserve the exact bytes that we read off the wire, along with the parsed form.
-    private final byte[] program;
+    @Nullable private final byte[] program;
 
-    // Creation time of the associated keys, or null if unknown.
-    @Nullable private final Instant creationTime;
+    /**
+     * If this is set, the script is associated with a creation time. This is currently used in the context of
+     * watching wallets only, where the scriptPubKeys being watched actually represent public keys and their addresses.
+     */
+    @Nullable
+    private final Instant creationTime;
 
     /**
      * Wraps given script chunks.
@@ -236,20 +239,18 @@ public class Script {
      * @return script that wraps the chunks
      */
     public static Script of(List<ScriptChunk> chunks) {
-        return of(chunks, TimeUtils.currentTime());
+        return of(chunks, null);
     }
 
     /**
      * Wraps given script chunks.
      *
      * @param chunks       chunks to wrap
-     * @param creationTime creation time of the script
+     * @param creationTime creation time to associate the script with
      * @return script that wraps the chunks
      */
     public static Script of(List<ScriptChunk> chunks, Instant creationTime) {
-        chunks = Collections.unmodifiableList(new ArrayList<>(chunks)); // defensive copy
-        Objects.requireNonNull(creationTime);
-        return new Script(null, chunks, creationTime);
+        return new Script(chunks, creationTime);
     }
 
     /**
@@ -261,32 +262,41 @@ public class Script {
      * @throws ScriptException if the program could not be parsed
      */
     public static Script parse(byte[] program) throws ScriptException {
-        return parse(program, TimeUtils.currentTime());
+        return parse(program, null);
     }
 
     /**
-     * Construct a script that copies and wraps a given program, and a creation time. The array is parsed and checked
-     * for syntactic validity. Programs like this are e.g. used in {@link TransactionInput} and
-     * {@link TransactionOutput}.
+     * Construct a script that copies and wraps a given program. The array is parsed and checked for syntactic
+     * validity. Programs like this are e.g. used in {@link TransactionInput} and {@link TransactionOutput}.
      *
      * @param program      Array of program bytes from a transaction.
-     * @param creationTime creation time of the script
+     * @param creationTime creation time to associate the script with
      * @return parsed program
      * @throws ScriptException if the program could not be parsed
      */
     public static Script parse(byte[] program, Instant creationTime) throws ScriptException {
-        Objects.requireNonNull(creationTime);
-        program = Arrays.copyOf(program, program.length); // defensive copy
-        List<ScriptChunk> chunks = new ArrayList<>(5); // common size
-        parseIntoChunks(program, chunks);
-        return new Script(program, chunks, creationTime);
+        return new Script(program, creationTime);
     }
 
     /**
      * To run a script, first we parse it which breaks it up into chunks representing pushes of data or logical
      * opcodes. Then we can run the parsed chunks.
+     * @param program program bytes to parse
+     * @return An unmodifiable list of chunks
      */
-    private static void parseIntoChunks(byte[] program, List<ScriptChunk> chunks) throws ScriptException {
+    private static List<ScriptChunk> parseIntoChunks(byte[] program) throws ScriptException {
+        List<ScriptChunk> chunks = new ArrayList<>();
+        parseIntoChunksPartial(program, chunks);
+        return Collections.unmodifiableList(chunks);
+    }
+
+    /**
+     * Parse a script program into a mutable List of chunks. If an exception is thrown a partial parsing
+     * will be present in the provided chunk list.
+     * @param program The script program
+     * @param chunks An empty, mutable array to fill with chunks
+     */
+    private static void parseIntoChunksPartial(byte[] program, List<ScriptChunk> chunks) throws ScriptException {
         ByteArrayInputStream bis = new ByteArrayInputStream(program);
         while (bis.available() > 0) {
             int opcode = bis.read();
@@ -327,9 +337,20 @@ public class Script {
         }
     }
 
-    private Script(byte[] programBytes, List<ScriptChunk> chunks, Instant creationTime) {
-        this.program = programBytes;
-        this.chunks = chunks;
+
+    // When constructing from a program, we store both program and chunks
+    private Script(byte[] program, @Nullable Instant creationTime) {
+        Objects.requireNonNull(program);
+        this.program = Arrays.copyOf(program, program.length); // defensive copy;
+        this.chunks = parseIntoChunks(this.program);
+        this.creationTime = creationTime;
+    }
+
+    // When constructing from chunks, we store only chunks, and generate program when getter is called
+    private Script(List<ScriptChunk> chunks, @Nullable Instant creationTime) {
+        Objects.requireNonNull(chunks);
+        this.program = null;
+        this.chunks = Collections.unmodifiableList(new ArrayList<>(chunks));    // defensive copy
         this.creationTime = creationTime;
     }
 
@@ -342,14 +363,13 @@ public class Script {
         if (program != null)
             // Don't round-trip as Bitcoin Core doesn't and it would introduce a mismatch.
             return Arrays.copyOf(program, program.length);
-        try {
-            ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            for (ScriptChunk chunk : chunks) {
-                chunk.write(bos);
-            }
-            return bos.toByteArray();
-        } catch (IOException e) {
-            throw new RuntimeException(e);  // Cannot happen.
+        else {
+            int size = chunks.stream().mapToInt(ScriptChunk::size).sum();
+            ByteBuffer buf = ByteBuffer.allocate(size);
+            chunks.forEach(chunk ->
+                buf.put(chunk.toByteArray())
+            );
+            return buf.array();
         }
     }
 
@@ -375,17 +395,14 @@ public class Script {
     }
 
     /**
-     * Gets the creation time of this script, or empty if unknown.
-     * @return creation time of this script, or empty if unknown
+     * Gets the associated creation time of this script, or empty if undefined. This is currently used in the context of
+     * watching wallets only, where the scriptPubKeys being watched actually represent public keys and their
+     * addresses.
+     *
+     * @return associated creation time of this script, or empty if undefined
      */
     public Optional<Instant> creationTime() {
         return Optional.ofNullable(creationTime);
-    }
-
-    /** @deprecated use {@link #creationTime()} */
-    @Deprecated
-    public long getCreationTimeSeconds() {
-        return creationTime().orElse(Instant.EPOCH).getEpochSecond();
     }
 
     /**
@@ -432,15 +449,6 @@ public class Script {
 
     /**
      * Gets the destination address from this script, if it's in the required form.
-     * @deprecated Use {@link #getToAddress(Network)}
-     */
-    @Deprecated
-    public Address getToAddress(NetworkParameters params) throws ScriptException {
-        return getToAddress(params.network(), false);
-    }
-
-    /**
-     * Gets the destination address from this script, if it's in the required form.
      *
      * @param forcePayToPubKey
      *            If true, allow payToPubKey to be casted to the corresponding address. This is useful if you prefer
@@ -459,19 +467,6 @@ public class Script {
             return SegwitAddress.fromProgram(network, 1, ScriptPattern.extractOutputKeyFromP2TR(this));
         else
             throw new ScriptException(ScriptError.SCRIPT_ERR_UNKNOWN_ERROR, "Cannot cast this script to an address");
-    }
-
-    /**
-     * Gets the destination address from this script, if it's in the required form.
-     *
-     * @param forcePayToPubKey
-     *            If true, allow payToPubKey to be casted to the corresponding address. This is useful if you prefer
-     *            showing addresses rather than pubkeys.
-     * @deprecated Use {@link #getToAddress(Network, boolean)}
-     */
-    @Deprecated
-    public Address getToAddress(NetworkParameters params, boolean forcePayToPubKey) throws ScriptException {
-        return getToAddress(params.network(), forcePayToPubKey);
     }
 
     ////////////////////// Interface for writing scripts from scratch ////////////////////////////////
@@ -714,7 +709,7 @@ public class Script {
     public static int getSigOpCount(byte[] program) throws ScriptException {
         List<ScriptChunk> chunks = new ArrayList<>(5); // common size
         try {
-            parseIntoChunks(program, chunks);
+            parseIntoChunksPartial(program, chunks);
         } catch (ScriptException e) {
             // Ignore errors and count up to the parse-able length
         }
@@ -727,7 +722,7 @@ public class Script {
     public static long getP2SHSigOpCount(byte[] scriptSig) throws ScriptException {
         List<ScriptChunk> chunks = new ArrayList<>(5); // common size
         try {
-            parseIntoChunks(scriptSig, chunks);
+            parseIntoChunksPartial(scriptSig, chunks);
         } catch (ScriptException e) {
             // Ignore errors and count up to the parse-able length
         }

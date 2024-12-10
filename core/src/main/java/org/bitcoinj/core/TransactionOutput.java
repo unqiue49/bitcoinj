@@ -119,12 +119,6 @@ public class TransactionOutput {
         availableForSpending = true;
     }
 
-    /** @deprecated use {@link TransactionOutput#TransactionOutput(Transaction, Coin, byte[])} */
-    @Deprecated
-    public TransactionOutput(NetworkParameters params, @Nullable Transaction parent, Coin value, byte[] scriptBytes) {
-        this(parent, value, scriptBytes);
-    }
-
     public Script getScriptPubKey() throws ScriptException {
         if (scriptPubKey == null) {
             scriptPubKey = Script.parse(scriptBytes);
@@ -154,12 +148,6 @@ public class TransactionOutput {
         return write(ByteBuffer.allocate(messageSize())).array();
     }
 
-    /** @deprecated use {@link #serialize()} */
-    @Deprecated
-    public byte[] bitcoinSerialize() {
-        return serialize();
-    }
-
     /**
      * Return the size of the serialized message. Note that if the message was deserialized from a payload, this
      * size can differ from the size of the original payload.
@@ -170,14 +158,6 @@ public class TransactionOutput {
         int size = Coin.BYTES; // value
         size += VarInt.sizeOf(scriptBytes.length) + scriptBytes.length;
         return size;
-    }
-
-    /**
-     * @deprecated Use {@link #messageSize()}
-     */
-    @Deprecated
-    public int getMessageSize() {
-        return messageSize();
     }
 
     /**

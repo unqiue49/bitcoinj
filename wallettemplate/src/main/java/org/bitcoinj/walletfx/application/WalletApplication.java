@@ -17,6 +17,7 @@
 package org.bitcoinj.walletfx.application;
 
 import com.google.common.util.concurrent.Service;
+import jakarta.annotation.Nullable;
 import javafx.application.Platform;
 import javafx.scene.input.KeyCombination;
 import javafx.stage.Stage;
@@ -24,7 +25,6 @@ import org.bitcoinj.base.BitcoinNetwork;
 import org.bitcoinj.base.ScriptType;
 import org.bitcoinj.base.internal.PlatformUtils;
 import org.bitcoinj.core.Context;
-import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.kits.WalletAppKit;
 import org.bitcoinj.utils.AppDataDirectory;
 import org.bitcoinj.utils.BriefLogFormatter;
@@ -34,7 +34,6 @@ import org.bitcoinj.wallet.KeyChainGroupStructure;
 import org.bitcoinj.walletfx.utils.GuiUtils;
 import wallettemplate.WalletSetPasswordController;
 
-import jakarta.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 
@@ -76,15 +75,6 @@ public abstract class WalletApplication implements AppDelegate {
 
     public String applicationName() {
         return applicationName;
-    }
-
-    /**
-     * @return Parameters for network this wallet is running on
-     * @deprecated Use {@link #network} (or {@link NetworkParameters#of} if you really need a {@link NetworkParameters}.)
-     */
-    @Deprecated
-    public NetworkParameters params() {
-        return NetworkParameters.of(network);
     }
 
     public BitcoinNetwork network() {
@@ -193,6 +183,7 @@ public abstract class WalletApplication implements AppDelegate {
             case TESTNET -> "test";
             case SIGNET -> "signet";
             case REGTEST -> "regtest";
+            default -> "unknown";
         };
     }
 }

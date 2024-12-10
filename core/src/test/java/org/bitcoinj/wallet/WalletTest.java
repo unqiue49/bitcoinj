@@ -101,7 +101,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -912,7 +911,7 @@ public class WalletTest extends TestWithWallet {
         // Test we keep pending double spends in IN_CONFLICT until one of them is included in a block
         // and we handle reorgs and dependency chains properly.
         // The following graph shows the txns we use in this test and how they are related
-        // (Eg txA1 spends txARoot outputs, txC1 spends txA1 and txB1 outputs, etc).
+        // (E.g. txA1 spends txARoot outputs, txC1 spends txA1 and txB1 outputs, etc).
         // txARoot (10)  -> txA1 (1)  -+
         //                             |--> txC1 (0.10) -> txD1 (0.01)
         // txBRoot (100) -> txB1 (11) -+
@@ -1708,7 +1707,7 @@ public class WalletTest extends TestWithWallet {
         File f = File.createTempFile("bitcoinj-unit-test", null);
         Sha256Hash hash1 = Sha256Hash.of(f);
         // Start with zero delay and ensure the wallet file changes after adding a key.
-        wallet.autosaveToFile(f, 0, TimeUnit.SECONDS, null);
+        wallet.autosaveToFile(f, Duration.ZERO, null);
         ECKey key = wallet.freshReceiveKey();
         Sha256Hash hash2 = Sha256Hash.of(f);
         assertFalse("Wallet not saved after generating fresh key", hash1.equals(hash2));  // File has changed.
@@ -1729,7 +1728,7 @@ public class WalletTest extends TestWithWallet {
         final CountDownLatch latch = new CountDownLatch(3);
         File f = File.createTempFile("bitcoinj-unit-test", null);
         Sha256Hash hash1 = Sha256Hash.of(f);
-        wallet.autosaveToFile(f, 1, TimeUnit.SECONDS,
+        wallet.autosaveToFile(f, Duration.ofSeconds(1),
                 new WalletFiles.Listener() {
                     @Override
                     public void onBeforeAutoSave(File tempFile) {

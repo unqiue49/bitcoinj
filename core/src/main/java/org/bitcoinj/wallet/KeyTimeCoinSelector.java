@@ -57,12 +57,6 @@ public class KeyTimeCoinSelector implements CoinSelector {
         this.ignorePending = ignorePending;
     }
 
-    /** @deprecated use {@link #KeyTimeCoinSelector(Wallet, Instant, boolean)} */
-    @Deprecated
-    public KeyTimeCoinSelector(Wallet wallet, long timeSecs, boolean ignorePending) {
-        this(wallet, Instant.ofEpochSecond(timeSecs), ignorePending);
-    }
-
     @Override
     public CoinSelection select(Coin target, List<TransactionOutput> candidates) {
         try {
@@ -79,7 +73,7 @@ public class KeyTimeCoinSelector implements CoinSelector {
     private boolean isKeyBeforeCutoff(TransactionOutput output) {
         Optional<ECKey> optKey = findKey(output);
         // It's older than the cutoff time so select.
-        return optKey.isPresent() && optKey.get().creationTime().orElse(Instant.EPOCH).isBefore(time);
+        return optKey.isPresent() && optKey.get().getCreationTime().orElse(Instant.EPOCH).isBefore(time);
     }
 
     /**

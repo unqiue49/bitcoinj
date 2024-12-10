@@ -1181,7 +1181,7 @@ public class FullBlockTestGenerator {
             tx.addOutput(ZERO, OP_TRUE_SCRIPT);
             addOnlyInputToTransaction(tx, out18, 0);
             b62.addTransaction(tx);
-            checkState(!tx.isFinal(chainHeadHeight + 17, b62.block.getTimeSeconds()));
+            checkState(!tx.isFinal(chainHeadHeight + 17, b62.block.time()));
         }
         b62.solve();
         blocks.add(new BlockAndValidity(b62, false, true, b60.getHash(), chainHeadHeight + 18, "b62"));
@@ -1194,7 +1194,7 @@ public class FullBlockTestGenerator {
         {
             b63.block.getTransactions().get(0).setLockTime(0xffffffffL);
             b63.block.getTransactions().get(0).getInput(0).setSequenceNumber(0xdeadbeefL);
-            checkState(!b63.block.getTransactions().get(0).isFinal(chainHeadHeight + 17, b63.block.getTimeSeconds()));
+            checkState(!b63.block.getTransactions().get(0).isFinal(chainHeadHeight + 17, b63.block.time()));
         }
         b63.solve();
         blocks.add(new BlockAndValidity(b63, false, true, b60.getHash(), chainHeadHeight + 18, "b63"));
@@ -1233,9 +1233,9 @@ public class FullBlockTestGenerator {
             checkState(stream.size() == b64Original.block.messageSize() + 8);
             // This check fails because it was created for "retain mode" and the likely encoding is not "optimal".
             // We since removed this capability retain the original encoding, but could not rewrite this test data.
-            // checkState(stream.size() == b64.getMessageSize());
-            // checkState(Arrays.equals(stream.toByteArray(), b64.bitcoinSerialize()));
-            // checkState(b64.getOptimalEncodingMessageSize() == b64Original.block.getMessageSize());
+            // checkState(stream.size() == b64.messageSize());
+            // checkState(Arrays.equals(stream.toByteArray(), b64.serialize()));
+            // checkState(b64.getOptimalEncodingMessageSize() == b64Original.block.messageSize());
         }
         blocks.add(new BlockAndValidity(b64, true, false, b64.getHash(), chainHeadHeight + 19, "b64"));
         spendableOutputs.offer(b64Original.getCoinbaseOutput());

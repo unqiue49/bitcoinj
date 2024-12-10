@@ -3,6 +3,7 @@ package com.gs.test;
 import org.bitcoinj.base.Address;
 import org.bitcoinj.base.Coin;
 import org.bitcoinj.base.LegacyAddress;
+import org.bitcoinj.base.ScriptType;
 import org.bitcoinj.base.internal.ByteUtils;
 import org.bitcoinj.core.*;
 import org.bitcoinj.crypto.ECKey;
@@ -79,12 +80,12 @@ public class PgTests {
         d = BigInteger.TEN;
         ECKey key = ECKey.fromPrivate(d, false);
         System.out.println(ByteUtils.formatHex(ByteUtils.bigIntegerToBytes(d, 32)));
-        System.out.println(LegacyAddress.fromKey(networkParameters, key));
+        System.out.println(key.toAddress(ScriptType.P2PKH, networkParameters.network()));
         System.out.println(key.getPublicKeyAsHex());
         System.out.println(ByteUtils.formatHex(CryptoUtils.sha256hash160(key.getPubKey())));
         key = ECKey.fromPrivate(d, true);
         System.out.println(ByteUtils.formatHex(ByteUtils.bigIntegerToBytes(d, 32)));
-        System.out.println(LegacyAddress.fromKey(networkParameters, key));
+        System.out.println(key.toAddress(ScriptType.P2PKH, networkParameters.network()));
         System.out.println(key.getPublicKeyAsHex());
         System.out.println(ByteUtils.formatHex(CryptoUtils.sha256hash160(key.getPubKey())));
     }

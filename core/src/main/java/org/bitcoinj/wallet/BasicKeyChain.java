@@ -22,7 +22,6 @@ import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.AesKey;
 import org.bitcoinj.core.BloomFilter;
 import org.bitcoinj.crypto.ECKey;
-import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.crypto.EncryptableItem;
 import org.bitcoinj.crypto.EncryptedData;
 import org.bitcoinj.crypto.KeyCrypter;
@@ -297,7 +296,7 @@ public class BasicKeyChain implements EncryptableKeyChain {
         lock.lock();
         try {
             return hashToKeys.values().stream()
-                    .map(key -> key.creationTime().orElse(Instant.EPOCH))
+                    .map(key -> key.getCreationTime().orElse(Instant.EPOCH))
                     .min(Instant::compareTo)
                     .orElse(Instant.MAX);
         } finally {
@@ -350,7 +349,7 @@ public class BasicKeyChain implements EncryptableKeyChain {
 
     /*package*/ static Protos.Key.Builder serializeEncryptableItem(EncryptableItem item) {
         Protos.Key.Builder proto = Protos.Key.newBuilder();
-        item.creationTime().ifPresent(creationTime -> proto.setCreationTimestamp(creationTime.toEpochMilli()));
+        item.getCreationTime().ifPresent(creationTime -> proto.setCreationTimestamp(creationTime.toEpochMilli()));
         if (item.isEncrypted() && item.getEncryptedData() != null) {
             // The encrypted data can be missing for an "encrypted" key in the case of a deterministic wallet for
             // which the leaf keys chain to an encrypted parent and rederive their private keys on the fly. In that
@@ -361,7 +360,7 @@ public class BasicKeyChain implements EncryptableKeyChain {
                     .setInitialisationVector(ByteString.copyFrom(data.initialisationVector)));
             // We don't allow mixing of encryption types at the moment.
             checkState(item.getEncryptionType() == Protos.Wallet.EncryptionType.ENCRYPTED_SCRYPT_AES);
-            proto.setType(Protos.Key.Type.ENCRYPTED_SCRYPT_AES);
+            proto.setType(Protos.Key.Type.ENCRYPTED);
         } else {
             final byte[] secret = item.getSecretBytes();
             // The secret might be missing in the case of a watching wallet, or a key for which the private key
@@ -401,9 +400,9 @@ public class BasicKeyChain implements EncryptableKeyChain {
             checkState(hashToKeys.isEmpty(), () ->
                     "tried to deserialize into a non-empty chain");
             for (Protos.Key key : keys) {
-                if (key.getType() != Protos.Key.Type.ORIGINAL && key.getType() != Protos.Key.Type.ENCRYPTED_SCRYPT_AES)
+                if (key.getType() != Protos.Key.Type.ORIGINAL && key.getType() != Protos.Key.Type.ENCRYPTED)
                     continue;
-                boolean encrypted = key.getType() == Protos.Key.Type.ENCRYPTED_SCRYPT_AES;
+                boolean encrypted = key.getType() == Protos.Key.Type.ENCRYPTED;
                 byte[] priv = key.hasSecretBytes() ? key.getSecretBytes().toByteArray() : null;
                 if (!key.hasPublicKey())
                     throw new UnreadableWalletException("Public key missing");
@@ -638,9 +637,9 @@ public class BasicKeyChain implements EncryptableKeyChain {
         try {
             ECKey oldest = null;
             for (ECKey key : hashToKeys.values()) {
-                Instant keyTime = key.creationTime().orElse(Instant.EPOCH);
+                Instant keyTime = key.getCreationTime().orElse(Instant.EPOCH);
                 if (keyTime.isAfter(time)) {
-                    if (oldest == null || oldest.creationTime().orElse(Instant.EPOCH).isAfter(keyTime))
+                    if (oldest == null || oldest.getCreationTime().orElse(Instant.EPOCH).isAfter(keyTime))
                         oldest = key;
                 }
             }
@@ -650,20 +649,13 @@ public class BasicKeyChain implements EncryptableKeyChain {
         }
     }
 
-    /** @deprecated use {@link #findOldestKeyAfter(Instant)} */
-    @Nullable
-    @Deprecated
-    public ECKey findOldestKeyAfter(long timeSecs) {
-        return findOldestKeyAfter(Instant.ofEpochSecond(timeSecs)).orElse(null);
-    }
-
     /** Returns a list of all ECKeys created after the given time. */
     public List<ECKey> findKeysBefore(Instant time) {
         lock.lock();
         try {
             List<ECKey> results = new LinkedList<>();
             for (ECKey key : hashToKeys.values()) {
-                Instant keyTime = key.creationTime().orElse(Instant.EPOCH);
+                Instant keyTime = key.getCreationTime().orElse(Instant.EPOCH);
                 if (keyTime.isBefore(time)) {
                     results.add(key);
                 }
@@ -674,12 +666,6 @@ public class BasicKeyChain implements EncryptableKeyChain {
         }
     }
 
-    /** @deprecated use {@link #findKeysBefore(Instant)} */
-    @Deprecated
-    public List<ECKey> findKeysBefore(long timeSecs) {
-        return findKeysBefore(Instant.ofEpochSecond(timeSecs));
-    }
-
     public String toString(boolean includePrivateKeys, @Nullable AesKey aesKey, Network network) {
         final StringBuilder builder = new StringBuilder();
         List<ECKey> keys = getKeys();
@@ -687,11 +673,5 @@ public class BasicKeyChain implements EncryptableKeyChain {
         for (ECKey key : keys)
             key.formatKeyWithAddress(includePrivateKeys, aesKey, builder, network, null, "imported");
         return builder.toString();
-    }
-
-    /** @deprecated use {@link #toString(boolean, AesKey, Network)} */
-    @Deprecated
-    public String toString(boolean includePrivateKeys, @Nullable AesKey aesKey, NetworkParameters params) {
-        return toString(includePrivateKeys, aesKey, params.network());
     }
 }

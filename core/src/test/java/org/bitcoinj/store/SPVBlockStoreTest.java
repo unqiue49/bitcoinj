@@ -36,8 +36,13 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.File;
+import java.io.RandomAccessFile;
 import java.math.BigInteger;
+import java.nio.Buffer;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Collections;
 
 import static org.junit.Assert.assertEquals;
@@ -149,7 +154,7 @@ public class SPVBlockStoreTest {
         Stopwatch watch = Stopwatch.start();
         for (int i = 0; i < ITERATIONS; i++) {
             // Using i as the nonce so that the block hashes are different.
-            Block block = new Block(0, Sha256Hash.ZERO_HASH, Sha256Hash.ZERO_HASH, 0, 0, i,
+            Block block = new Block(0, Sha256Hash.ZERO_HASH, Sha256Hash.ZERO_HASH, Instant.EPOCH, 0, i,
                     Collections.emptyList());
             StoredBlock b = new StoredBlock(block, BigInteger.ZERO, i);
             store.put(b);
@@ -188,5 +193,35 @@ public class SPVBlockStoreTest {
             // TODO: Deletion is failing on Windows
             assertTrue(deleted);
         }
+    }
+
+    @Test
+    public void migrateV1toV2() throws Exception {
+        // create V1 format
+        RandomAccessFile raf = new RandomAccessFile(blockStoreFile, "rw");
+        FileChannel channel = raf.getChannel();
+        ByteBuffer buffer = channel.map(FileChannel.MapMode.READ_WRITE, 0,
+                SPVBlockStore.FILE_PROLOGUE_BYTES + SPVBlockStore.RECORD_SIZE_V1 * 3);
+        buffer.put(SPVBlockStore.HEADER_MAGIC_V1); // header magic
+        Block genesisBlock = TESTNET.getGenesisBlock();
+        StoredBlock storedGenesisBlock = new StoredBlock(genesisBlock.cloneAsHeader(), genesisBlock.getWork(), 0);
+        Sha256Hash genesisHash = storedGenesisBlock.getHeader().getHash();
+        ((Buffer) buffer).position(SPVBlockStore.FILE_PROLOGUE_BYTES);
+        buffer.put(genesisHash.getBytes());
+        storedGenesisBlock.serializeCompact(buffer);
+        buffer.putInt(4, buffer.position()); // ring cursor
+        ((Buffer) buffer).position(8);
+        buffer.put(genesisHash.getBytes()); // chain head
+        raf.close();
+
+        // migrate to V2 format
+        SPVBlockStore store = new SPVBlockStore(TESTNET, blockStoreFile);
+
+        // check block is the same
+        assertEquals(genesisHash, store.getChainHead().getHeader().getHash());
+        // check ring cursor
+        assertEquals(SPVBlockStore.FILE_PROLOGUE_BYTES + SPVBlockStore.RECORD_SIZE_V2 * 1,
+                store.getRingCursor());
+        store.close();
     }
 }

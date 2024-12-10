@@ -17,7 +17,7 @@
 package org.bitcoinj.examples;
 
 import org.bitcoinj.base.BitcoinNetwork;
-import org.bitcoinj.core.*;
+import org.bitcoinj.core.TransactionConfidence;
 import org.bitcoinj.kits.WalletAppKit;
 
 import java.io.File;
@@ -55,7 +55,7 @@ public class Kit {
         });
 
         kit.wallet().addCoinsReceivedEventListener((wallet, tx, prevBalance, newBalance) -> {
-            System.out.println("-----> coins resceived: " + tx.getTxId());
+            System.out.println("-----> coins received: " + tx.getTxId());
             System.out.println("received: " + tx.getValue(wallet));
         });
 

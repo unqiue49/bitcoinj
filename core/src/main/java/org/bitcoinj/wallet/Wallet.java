@@ -85,7 +85,6 @@ import org.bitcoinj.signers.MissingSigResolutionSigner;
 import org.bitcoinj.signers.TransactionSigner;
 import org.bitcoinj.utils.BaseTaggableObject;
 import org.bitcoinj.base.internal.FutureUtils;
-import org.bitcoinj.utils.ListenableCompletableFuture;
 import org.bitcoinj.utils.ListenerRegistration;
 import org.bitcoinj.utils.Threading;
 import org.bitcoinj.protobuf.wallet.Protos;
@@ -118,7 +117,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Date;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -135,7 +133,6 @@ import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
@@ -178,8 +175,8 @@ import static org.bitcoinj.base.internal.Preconditions.checkState;
  * <p>Wallets can be serialized using protocol buffers. You need to save the wallet whenever it changes, there is an
  * auto-save feature that simplifies this for you although you're still responsible for manually triggering a save when
  * your app is about to quit because the auto-save feature waits a moment before actually committing to disk to avoid IO
- * thrashing when the wallet is changing very fast (eg due to a block chain sync). See
- * {@link Wallet#autosaveToFile(File, long, TimeUnit, WalletFiles.Listener)}
+ * thrashing when the wallet is changing very fast (e.g. due to a block chain sync). See
+ * {@link Wallet#autosaveToFile(File, Duration, WalletFiles.Listener)}
  * for more information about this.</p>
  */
 public class Wallet extends BaseTaggableObject
@@ -328,14 +325,6 @@ public class Wallet extends BaseTaggableObject
     }
 
     /**
-     * @deprecated use {@link #createDeterministic(Network, ScriptType)}
-     */
-    @Deprecated
-    public static Wallet createDeterministic(NetworkParameters params, ScriptType outputScriptType) {
-        return createDeterministic(params.network(), outputScriptType);
-    }
-
-    /**
      * Creates a new, empty wallet with a randomly chosen seed and no transactions. Make sure to provide for sufficient
      * backup! Any keys will be derived from the seed. If you want to restore a wallet from disk instead, see
      * {@link #loadFromFile}.
@@ -349,28 +338,12 @@ public class Wallet extends BaseTaggableObject
     }
 
     /**
-     * @deprecated use {@link Wallet#createDeterministic(Network, ScriptType, KeyChainGroupStructure)}
-     */
-    @Deprecated
-    public static Wallet createDeterministic(NetworkParameters params, ScriptType outputScriptType, KeyChainGroupStructure keyChainGroupStructure) {
-        return new Wallet(params.network(), KeyChainGroup.builder(params.network(), keyChainGroupStructure).fromRandom(outputScriptType).build());
-    }
-
-    /**
      * Creates a new, empty wallet with just a basic keychain and no transactions. No deterministic chains will be created
      * automatically. This is meant for when you just want to import a few keys and operate on them.
      * @param network network wallet will operate on
      */
     public static Wallet createBasic(Network network) {
         return new Wallet(network, KeyChainGroup.createBasic(network));
-    }
-
-    /**
-     * @deprecated use {@link #createBasic(Network)}
-     */
-    @Deprecated
-    public static Wallet createBasic(NetworkParameters params) {
-        return createBasic(params.network());
     }
 
     /**
@@ -385,15 +358,6 @@ public class Wallet extends BaseTaggableObject
     }
 
     /**
-     * @deprecated use {@link #fromSeed(Network, DeterministicSeed, ScriptType)}
-     */
-    @Deprecated
-    public static Wallet fromSeed(NetworkParameters params, DeterministicSeed seed,
-                                  ScriptType outputScriptType) {
-        return fromSeed(params.network(), seed, outputScriptType);
-    }
-
-    /**
      * @param network network wallet will operate on
      * @param seed deterministic seed
      * @param outputScriptType type of addresses (aka output scripts) to generate for receiving
@@ -403,15 +367,6 @@ public class Wallet extends BaseTaggableObject
     public static Wallet fromSeed(Network network, DeterministicSeed seed, ScriptType outputScriptType,
             KeyChainGroupStructure structure) {
         return new Wallet(network, KeyChainGroup.builder(network, structure).fromSeed(seed, outputScriptType).build());
-    }
-
-    /**
-     * @deprecated use {@link #fromSeed(Network, DeterministicSeed, ScriptType, KeyChainGroupStructure)}
-     */
-    @Deprecated
-    public static Wallet fromSeed(NetworkParameters params, DeterministicSeed seed, ScriptType outputScriptType,
-                                  KeyChainGroupStructure structure) {
-        return fromSeed(params.network(), seed, outputScriptType, structure);
     }
 
     /**
@@ -429,15 +384,6 @@ public class Wallet extends BaseTaggableObject
     }
 
     /**
-     * @deprecated use {@link #fromSeed(Network, DeterministicSeed, ScriptType, List)}
-     */
-    @Deprecated
-    public static Wallet fromSeed(NetworkParameters params, DeterministicSeed seed, ScriptType outputScriptType,
-                                  List<ChildNumber> accountPath) {
-        return fromSeed(params.network(), seed, outputScriptType, accountPath);
-    }
-
-    /**
      * Creates a wallet that tracks payments to and from the HD key hierarchy rooted by the given watching key. This HAS
      * to be an account key as returned by {@link DeterministicKeyChain#getWatchingKey()}.
      */
@@ -446,15 +392,6 @@ public class Wallet extends BaseTaggableObject
         DeterministicKeyChain chain = DeterministicKeyChain.builder().watch(watchKey).outputScriptType(outputScriptType)
                 .build();
         return new Wallet(network, KeyChainGroup.builder(network).addChain(chain).build());
-    }
-
-    /**
-     * @deprecated use {@link #fromWatchingKey(Network, DeterministicKey, ScriptType)}
-     */
-    @Deprecated
-    public static Wallet fromWatchingKey(NetworkParameters params, DeterministicKey watchKey,
-                                         ScriptType outputScriptType) {
-        return fromWatchingKey(params.network(), watchKey, outputScriptType);
     }
 
     /**
@@ -472,14 +409,6 @@ public class Wallet extends BaseTaggableObject
     }
 
     /**
-     * @deprecated use {@link #fromWatchingKeyB58(Network, String, Instant)}
-     */
-    @Deprecated
-    public static Wallet fromWatchingKeyB58(NetworkParameters params, String watchKeyB58, Instant creationTime) {
-        return fromWatchingKeyB58(params.network(), watchKeyB58, creationTime);
-    }
-
-    /**
      * Creates a wallet that tracks payments to and from the HD key hierarchy rooted by the given watching key. The
      * account path is specified. The key's creation time will be set to {@link DeterministicHierarchy#BIP32_STANDARDISATION_TIME}
      * @param network network wallet will operate on
@@ -488,24 +417,6 @@ public class Wallet extends BaseTaggableObject
      */
     public static Wallet fromWatchingKeyB58(Network network, String watchKeyB58) {
         return fromWatchingKeyB58(network, watchKeyB58, DeterministicHierarchy.BIP32_STANDARDISATION_TIME);
-    }
-
-    /**
-     * @deprecated use {@link #fromWatchingKeyB58(Network, String)}
-     */
-    @Deprecated
-    public static Wallet fromWatchingKeyB58(NetworkParameters params, String watchKeyB58) {
-        return fromWatchingKeyB58(params.network(), watchKeyB58);
-    }
-
-    /**
-     * @deprecated Use {@link #fromWatchingKeyB58(Network, String, Instant)} or {@link #fromWatchingKeyB58(Network, String)}
-     */
-    @Deprecated
-    public static Wallet fromWatchingKeyB58(NetworkParameters params, String watchKeyB58, long creationTimeSeconds) {
-        return (creationTimeSeconds == 0)
-                ? fromWatchingKeyB58(params.network(), watchKeyB58)
-                : fromWatchingKeyB58(params.network(), watchKeyB58, Instant.ofEpochSecond(creationTimeSeconds));
     }
 
     /**
@@ -518,17 +429,6 @@ public class Wallet extends BaseTaggableObject
         DeterministicKeyChain chain = DeterministicKeyChain.builder().spend(spendKey).outputScriptType(outputScriptType)
                 .build();
         return new Wallet(network, KeyChainGroup.builder(network).addChain(chain).build());
-    }
-
-    /**
-     * @deprecated use {@link #fromSpendingKey(Network, DeterministicKey, ScriptType)}
-     */
-    @Deprecated
-    public static Wallet fromSpendingKey(NetworkParameters params, DeterministicKey spendKey,
-                                         ScriptType outputScriptType) {
-        DeterministicKeyChain chain = DeterministicKeyChain.builder().spend(spendKey).outputScriptType(outputScriptType)
-                .build();
-        return new Wallet(params.network(), KeyChainGroup.builder(params.network()).addChain(chain).build());
     }
 
     /**
@@ -545,14 +445,6 @@ public class Wallet extends BaseTaggableObject
     }
 
     /**
-     * @deprecated use {@link #fromWatchingKeyB58(Network, String, Instant)}
-     */
-    @Deprecated
-    public static Wallet fromSpendingKeyB58(NetworkParameters params, String spendingKeyB58, Instant creationTime) {
-        return fromWatchingKeyB58(params.network(), spendingKeyB58, creationTime);
-    }
-
-    /**
      * Creates a wallet that tracks payments to and from the HD key hierarchy rooted by the given spending key.
      * The key's creation time will be set to {@link DeterministicHierarchy#BIP32_STANDARDISATION_TIME}.
      * @param network network wallet will operate on
@@ -564,33 +456,23 @@ public class Wallet extends BaseTaggableObject
     }
 
     /**
-     * @deprecated use {@link #fromSpendingKeyB58(Network, String)}
-     */
-    @Deprecated
-    public static Wallet fromSpendingKeyB58(NetworkParameters params, String spendingKeyB58) {
-        return fromSpendingKeyB58(params.network(), spendingKeyB58);
-    }
-
-    /**
-     * @deprecated Use {@link #fromSpendingKeyB58(Network, String, Instant)} or {@link #fromSpendingKeyB58(Network, String)}
-     */
-    @Deprecated
-    public static Wallet fromSpendingKeyB58(NetworkParameters params, String spendingKeyB58, long creationTimeSeconds) {
-        return (creationTimeSeconds == 0)
-                ? fromSpendingKeyB58(params.network(), spendingKeyB58)
-                : fromSpendingKeyB58(params.network(), spendingKeyB58, Instant.ofEpochSecond(creationTimeSeconds));
-    }
-
-    /**
-     * Creates a wallet that tracks payments to and from the HD key hierarchy rooted by the given spending key. This HAS
-     * to be an account key as returned by {@link DeterministicKeyChain#getWatchingKey()}.
-     * @param network network wallet will operate on
+     * Creates a spending wallet that tracks payments to and from a BIP32-style HD key hierarchy rooted by {@code masterKey} and
+     * {@code accountNumber}. The account path must be directly below the master key as in BIP-32.
+     * <p>
+     * This method should not be used for BIP-43 compliant wallets or accounts not of the form {@code m/accountNumber'}.
+     * <p>
+     * This wallet will not store the {@code masterKey}, only the account key.
+     * @param network network the wallet will operate on
+     * @param masterKey root private key (e.g. path {@code m})
+     * @param outputScriptType type of addresses (aka output scripts) to generate for receiving
+     * @param accountNumber account number to append, resulting in an account path of {@code m/accountNumber'}
+     * @return newly created Wallet object
      */
     public static Wallet fromMasterKey(Network network, DeterministicKey masterKey,
                                        ScriptType outputScriptType, ChildNumber accountNumber) {
         DeterministicKey accountKey = HDKeyDerivation.deriveChildKey(masterKey, accountNumber);
-        accountKey = accountKey.dropParent();
-        Optional<Instant> creationTime = masterKey.creationTime();
+        accountKey = accountKey.dropParent();   // Drop the parent private key, so it won't be used or saved.
+        Optional<Instant> creationTime = masterKey.getCreationTime();
         if (creationTime.isPresent())
             accountKey.setCreationTime(creationTime.get());
         else
@@ -598,15 +480,6 @@ public class Wallet extends BaseTaggableObject
         DeterministicKeyChain chain = DeterministicKeyChain.builder().spend(accountKey)
                 .outputScriptType(outputScriptType).build();
         return new Wallet(network, KeyChainGroup.builder(network).addChain(chain).build());
-    }
-
-    /**
-     * @deprecated use {@link #fromMasterKey(Network, DeterministicKey, ScriptType, ChildNumber)}
-     */
-    @Deprecated
-    public static Wallet fromMasterKey(NetworkParameters params, DeterministicKey masterKey,
-                                       ScriptType outputScriptType, ChildNumber accountNumber) {
-        return fromMasterKey(params.network(), masterKey, outputScriptType, accountNumber);
     }
 
     private static ScriptType outputScriptTypeFromB58(NetworkParameters params, String base58) {
@@ -620,9 +493,9 @@ public class Wallet extends BaseTaggableObject
     }
 
     /**
-     * Creates a new, empty wallet with a randomly chosen seed and no transactions. Make sure to provide for sufficient
-     * backup! Any keys will be derived from the seed. If you want to restore a wallet from disk instead, see
-     * {@link #loadFromFile}.
+     * Creates a new, empty wallet with no transactions. If you haven't already done so,
+     * make sure to provide for sufficient backup of the keys in the {@link KeyChainGroup}.
+     * To restore a wallet from disk instead, see {@link #loadFromFile}.
      * @param network network wallet will operate on
      * @param keyChainGroup keychain group to manage keychains
      */
@@ -644,14 +517,6 @@ public class Wallet extends BaseTaggableObject
         signers = new ArrayList<>();
         addTransactionSigner(new LocalTransactionSigner());
         createTransientState();
-    }
-
-    /**
-     * @deprecated  use {@link Wallet(NetworkParameters, KeyChainGroup)}
-     */
-    @Deprecated
-    public Wallet(NetworkParameters params, KeyChainGroup keyChainGroup) {
-        this(params.network(), keyChainGroup);
     }
 
     private void createTransientState() {
@@ -680,14 +545,6 @@ public class Wallet extends BaseTaggableObject
 
     public Network network() {
         return network;
-    }
-
-    /**
-     * @deprecated Use {@link #network()}
-     */
-    @Deprecated
-    public NetworkParameters getNetworkParameters() {
-        return params;
     }
 
     /**
@@ -1044,7 +901,7 @@ public class Wallet extends BaseTaggableObject
 
     /**
      * Imports the given keys to the wallet.
-     * If {@link Wallet#autosaveToFile(File, long, TimeUnit, WalletFiles.Listener)}
+     * If {@link Wallet#autosaveToFile(File, Duration, WalletFiles.Listener)}
      * has been called, triggers an auto save bypassing the normal coalescing delay and event handlers.
      * Returns the number of keys added, after duplicates are ignored. The onKeyAdded event will be called for each key
      * in the list that was not already present.
@@ -1165,7 +1022,7 @@ public class Wallet extends BaseTaggableObject
     }
 
     /**
-     * Same as {@link #addWatchedAddress(Address, long)} with the current time as the creation time.
+     * Same as {@link #addWatchedAddress(Address, Instant)} with the current time as the creation time.
      */
     public boolean addWatchedAddress(final Address address) {
         Instant now = TimeUtils.currentTime();
@@ -1180,14 +1037,6 @@ public class Wallet extends BaseTaggableObject
      */
     public boolean addWatchedAddress(final Address address, Instant creationTime) {
         return addWatchedAddresses(Collections.singletonList(address), creationTime) == 1;
-    }
-
-    /** @deprecated use {@link #addWatchedAddress(Address, Instant)} or {@link #addWatchedAddress(Address)} */
-    @Deprecated
-    public boolean addWatchedAddress(final Address address, long creationTime) {
-        return creationTime > 0 ?
-                addWatchedAddress(address, Instant.ofEpochSecond(creationTime)) :
-                addWatchedAddress(address);
     }
 
     /**
@@ -1219,14 +1068,6 @@ public class Wallet extends BaseTaggableObject
             scripts.add(script);
         }
         return addWatchedScripts(scripts);
-    }
-
-    /** @deprecated use {@link #addWatchedAddresses(List, Instant)} or {@link #addWatchedAddresses(List)} */
-    @Deprecated
-    public int addWatchedAddresses(final List<Address> addresses, long creationTime) {
-        return creationTime > 0 ?
-                addWatchedAddresses(addresses, creationTime) :
-                addWatchedAddresses(addresses);
     }
 
     /**
@@ -1825,9 +1666,9 @@ public class Wallet extends BaseTaggableObject
      * <p>A background thread will be created and the wallet will only be saved to
      * disk every periodically. If no changes have occurred for the given time period, nothing will be written.
      * In this way disk IO can be rate limited. It's a good idea to set this as otherwise the wallet can change very
-     * frequently, eg if there are a lot of transactions in it or during block sync, and there will be a lot of redundant
+     * frequently, e.g. if there are a lot of transactions in it or during block sync, and there will be a lot of redundant
      * writes. Note that when a new key is added, that always results in an immediate save regardless of
-     * delayTime. <b>You should still save the wallet manually using {@link Wallet#saveToFile(File)} when your program
+     * delay. <b>You should still save the wallet manually using {@link Wallet#saveToFile(File)} when your program
      * is about to shut down as the JVM will not wait for the background thread.</b></p>
      *
      * <p>An event listener can be provided. It will be called on a background thread
@@ -1852,16 +1693,10 @@ public class Wallet extends BaseTaggableObject
         }
     }
 
-    /** @deprecated use {@link #autosaveToFile(File, Duration, WalletFiles.Listener)} */
-    @Deprecated
-    public WalletFiles autosaveToFile(File f, long delayTime, TimeUnit timeUnit, @Nullable WalletFiles.Listener eventListener) {
-        return autosaveToFile(f, Duration.ofMillis(timeUnit.toMillis(delayTime)), eventListener);
-    }
-
     /**
      * <p>
      * Disables auto-saving, after it had been enabled with
-     * {@link Wallet#autosaveToFile(File, long, TimeUnit, WalletFiles.Listener)}
+     * {@link Wallet#autosaveToFile(File, Duration, WalletFiles.Listener)}
      * before. This method blocks until finished.
      * </p>
      */
@@ -1912,15 +1747,6 @@ public class Wallet extends BaseTaggableObject
         } finally {
             lock.unlock();
         }
-    }
-
-    /**
-     * Returns the parameters this wallet was created with.
-     * @deprecated Use {@link #network()}
-     */
-    @Deprecated
-    public NetworkParameters getParams() {
-        return params;
     }
 
     /**
@@ -2544,7 +2370,7 @@ public class Wallet extends BaseTaggableObject
 
     /**
      * Creates and returns a new List with the same txns as inputSet
-     * but txns are sorted by depencency (a topological sort).
+     * but txns are sorted by dependency (a topological sort).
      * If tx B spends tx A, then tx A should be before tx B on the returned List.
      * Several invocations to this method with the same inputSet could result in lists with txns in different order,
      * as there is no guarantee on the order of the returned txns besides what was already stated.
@@ -3384,7 +3210,7 @@ public class Wallet extends BaseTaggableObject
      * Dead transactions (overridden by double spends) are optionally included.</p>
      * <p>Note: the current implementation is O(num transactions in wallet). Regardless of how many transactions are
      * requested, the cost is always the same. In future, requesting smaller numbers of transactions may be faster
-     * depending on how the wallet is implemented (eg if backed by a database).</p>
+     * depending on how the wallet is implemented (e.g. if backed by a database).</p>
      */
     public List<Transaction> getRecentTransactions(int numTransactions, boolean includeDead) {
         lock.lock();
@@ -3774,7 +3600,7 @@ public class Wallet extends BaseTaggableObject
 
     /**
      * Returns the earliest creation time of keys or watched scripts in this wallet, ie the min
-     * of {@link ECKey#creationTime()}. This can return {@link Instant#EPOCH} if at least one key does
+     * of {@link ECKey#getCreationTime()}. This can return {@link Instant#EPOCH} if at least one key does
      * not have that data (e.g. is an imported key with unknown timestamp). <p>
      *
      * This method is most often used in conjunction with {@link PeerGroup#setFastCatchupTime(Instant)} in order to
@@ -3848,13 +3674,6 @@ public class Wallet extends BaseTaggableObject
         }
     }
 
-    /** @deprecated use {@link #setLastBlockSeenTime(Instant)} or {@link #clearLastBlockSeenTime()} */
-    @Deprecated
-    public void setLastBlockSeenTimeSecs(long timeSecs) {
-        checkArgument(timeSecs > 0);
-        setLastBlockSeenTime(Instant.ofEpochSecond(timeSecs));
-    }
-
     /**
      * Returns time extracted from the last best seen block header, or empty. This timestamp
      * is <b>not</b> the local time at which the block was first observed by this application but rather what the block
@@ -3869,19 +3688,6 @@ public class Wallet extends BaseTaggableObject
         } finally {
             lock.unlock();
         }
-    }
-
-    /** @deprecated use {@link #lastBlockSeenTime()} */
-    @Deprecated
-    public long getLastBlockSeenTimeSecs() {
-        return lastBlockSeenTime().map(Instant::getEpochSecond).orElse((long) 0);
-    }
-
-    /** @deprecated use {@link #lastBlockSeenTime()} */
-    @Deprecated
-    @Nullable
-    public Date getLastBlockSeenTime() {
-        return lastBlockSeenTime().map(Date::from).orElse(null);
     }
 
     /**
@@ -4043,7 +3849,7 @@ public class Wallet extends BaseTaggableObject
      * you can use {@link Threading#waitForUserCode()} to block until the future had a
      * chance to be updated.</p>
      */
-    public ListenableCompletableFuture<Coin> getBalanceFuture(final Coin value, final BalanceType type) {
+    public CompletableFuture<Coin> getBalanceFuture(final Coin value, final BalanceType type) {
         lock.lock();
         try {
             final CompletableFuture<Coin> future = new CompletableFuture<>();
@@ -4057,7 +3863,7 @@ public class Wallet extends BaseTaggableObject
                 // avoid giving the user back futures that require the user code thread to be free.
                 balanceFutureRequests.add(new BalanceFutureRequest(future, value, type));
             }
-            return ListenableCompletableFuture.of(future);
+            return future;
         } finally {
             lock.unlock();
         }
@@ -4173,7 +3979,7 @@ public class Wallet extends BaseTaggableObject
          * @deprecated Use {@link #awaitRelayed()}
          */
         @Deprecated
-        public final ListenableCompletableFuture<Transaction> broadcastComplete;
+        public final CompletableFuture<Transaction> broadcastComplete;
         /**
          * The broadcast object returned by the linked TransactionBroadcaster
          * @deprecated Use {@link #getBroadcast()}
@@ -4192,7 +3998,7 @@ public class Wallet extends BaseTaggableObject
         public SendResult(TransactionBroadcast broadcast) {
             this.tx = broadcast.transaction();
             this.broadcast = broadcast;
-            this.broadcastComplete = ListenableCompletableFuture.of(broadcast.awaitRelayed().thenApply(TransactionBroadcast::transaction));
+            this.broadcastComplete = broadcast.awaitRelayed().thenApply(TransactionBroadcast::transaction);
         }
 
         public Transaction transaction() {
@@ -5543,7 +5349,7 @@ public class Wallet extends BaseTaggableObject
 
     private void addSuppliedInputs(Transaction tx, List<TransactionInput> originalInputs) {
         for (TransactionInput input : originalInputs)
-            tx.addInput(TransactionInput.read(ByteBuffer.wrap(input.bitcoinSerialize()), tx));
+            tx.addInput(TransactionInput.read(ByteBuffer.wrap(input.serialize()), tx));
     }
 
     private Coin estimateFees(Transaction tx, CoinSelection coinSelection, Coin requestedFeePerKb, boolean ensureMinRequiredFee) {
@@ -5667,24 +5473,6 @@ public class Wallet extends BaseTaggableObject
         saveNow();
     }
 
-    /** @deprecated use {@link #setKeyRotationTime(Instant)} */
-    @Deprecated
-    public void setKeyRotationTime(long timeSecs) {
-        if (timeSecs == 0)
-            setKeyRotationTime((Instant) null);
-        else
-            setKeyRotationTime(Instant.ofEpochSecond(timeSecs));
-    }
-
-    /** @deprecated use {@link #setKeyRotationTime(Instant)} */
-    @Deprecated
-    public void setKeyRotationTime(@Nullable Date time) {
-        if (time == null)
-            setKeyRotationTime((Instant) null);
-        else
-            setKeyRotationTime(Instant.ofEpochMilli(time.getTime()));
-    }
-
     /**
      * Returns the key rotation time, or empty if unconfigured. See {@link #setKeyRotationTime(Instant)} for a description
      * of the field.
@@ -5693,20 +5481,10 @@ public class Wallet extends BaseTaggableObject
         return Optional.ofNullable(vKeyRotationTime);
     }
 
-    /** @deprecated use {@link #keyRotationTime()} */
-    @Deprecated
-    public @Nullable Date getKeyRotationTime() {
-        Instant keyRotationTime = vKeyRotationTime;
-        if (keyRotationTime != null)
-            return Date.from(keyRotationTime);
-        else
-            return null;
-    }
-
     /** Returns whether the keys creation time is before the key rotation time, if one was set. */
     public boolean isKeyRotating(ECKey key) {
         Instant keyRotationTime = vKeyRotationTime;
-        return keyRotationTime != null && key.creationTime().orElse(Instant.EPOCH).isBefore(keyRotationTime);
+        return keyRotationTime != null && key.getCreationTime().orElse(Instant.EPOCH).isBefore(keyRotationTime);
     }
 
     /**
@@ -5723,7 +5501,7 @@ public class Wallet extends BaseTaggableObject
      * @return A list of transactions that the wallet just made/will make for internal maintenance. Might be empty.
      * @throws org.bitcoinj.wallet.DeterministicUpgradeRequiresPassword if key rotation requires the users password.
      */
-    public ListenableCompletableFuture<List<Transaction>> doMaintenance(@Nullable AesKey aesKey, boolean signAndSend)
+    public CompletableFuture<List<Transaction>> doMaintenance(@Nullable AesKey aesKey, boolean signAndSend)
             throws DeterministicUpgradeRequiresPassword {
         return doMaintenance(KeyChainGroupStructure.BIP32, aesKey, signAndSend);
     }
@@ -5743,7 +5521,7 @@ public class Wallet extends BaseTaggableObject
      * @return A list of transactions that the wallet just made/will make for internal maintenance. Might be empty.
      * @throws org.bitcoinj.wallet.DeterministicUpgradeRequiresPassword if key rotation requires the users password.
      */
-    public ListenableCompletableFuture<List<Transaction>> doMaintenance(KeyChainGroupStructure structure,
+    public CompletableFuture<List<Transaction>> doMaintenance(KeyChainGroupStructure structure,
             @Nullable AesKey aesKey, boolean signAndSend) throws DeterministicUpgradeRequiresPassword {
         List<Transaction> txns;
         lock.lock();
@@ -5751,7 +5529,7 @@ public class Wallet extends BaseTaggableObject
         try {
             txns = maybeRotateKeys(structure, aesKey, signAndSend);
             if (!signAndSend)
-                return ListenableCompletableFuture.completedFuture(txns);
+                return CompletableFuture.completedFuture(txns);
         } finally {
             keyChainGroupLock.unlock();
             lock.unlock();
@@ -5776,7 +5554,7 @@ public class Wallet extends BaseTaggableObject
                 log.error("Failed to broadcast rekey tx", e);
             }
         }
-        return ListenableCompletableFuture.of(FutureUtils.allAsList(futures));
+        return FutureUtils.allAsList(futures);
     }
 
     // Checks to see if any coins are controlled by rotating keys and if so, spends them.

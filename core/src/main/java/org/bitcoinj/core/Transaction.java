@@ -58,7 +58,6 @@ import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -562,12 +561,6 @@ public class Transaction extends BaseMessage {
         return Optional.ofNullable(updateTime);
     }
 
-    /** @deprecated use {@link #updateTime()} */
-    @Deprecated
-    public Date getUpdateTime() {
-        return Date.from(updateTime().orElse(Instant.EPOCH));
-    }
-
     /**
      * Sets the update time of this transaction.
      * @param updateTime update time
@@ -581,15 +574,6 @@ public class Transaction extends BaseMessage {
      */
     public void clearUpdateTime() {
         this.updateTime = null;
-    }
-
-    /** @deprecated use {@link #setUpdateTime(Instant)} or {@link #clearUpdateTime()} */
-    @Deprecated
-    public void setUpdateTime(Date updateTime) {
-        if (updateTime != null && updateTime.getTime() > 0)
-            setUpdateTime(updateTime.toInstant());
-        else
-            clearUpdateTime();
     }
 
     /**
@@ -1667,7 +1651,7 @@ public class Transaction extends BaseMessage {
      * <p>A transaction is time-locked if at least one of its inputs is non-final and it has a lock time. A transaction can
      * also have a relative lock time which this method doesn't tell. Use {@link #hasRelativeLockTime()} to find out.</p>
      *
-     * <p>To check if this transaction is final at a given height and time, see {@link Transaction#isFinal(int, long)}
+     * <p>To check if this transaction is final at a given height and time, see {@link Transaction#isFinal(int, Instant)}
      * </p>
      */
     public boolean isTimeLocked() {
@@ -1713,9 +1697,9 @@ public class Transaction extends BaseMessage {
      * <p>Note that currently the replacement feature is disabled in Bitcoin Core and will need to be
      * re-activated before this functionality is useful.</p>
      */
-    public boolean isFinal(int height, long blockTimeSeconds) {
+    public boolean isFinal(int height, Instant blockTime) {
         LockTime locktime = lockTime();
-        return locktime.rawValue() < (locktime instanceof HeightLock ? height : blockTimeSeconds) ||
+        return locktime.rawValue() < (locktime instanceof HeightLock ? height : blockTime.getEpochSecond()) ||
                 !isTimeLocked();
     }
 
@@ -1728,12 +1712,6 @@ public class Transaction extends BaseMessage {
         return locktime instanceof HeightLock ?
                 chain.estimateBlockTimeInstant(((HeightLock) locktime).blockHeight()) :
                 ((TimeLock) locktime).timestamp();
-    }
-
-    /** @deprecated use {@link #estimateUnlockTime(AbstractBlockChain)} */
-    @Deprecated
-    public Date estimateLockTime(AbstractBlockChain chain) {
-        return Date.from(estimateUnlockTime(chain));
     }
 
     /**
@@ -1836,13 +1814,5 @@ public class Transaction extends BaseMessage {
                 if (input.isCoinBase())
                     throw new VerificationException.UnexpectedCoinbaseInput();
         }
-    }
-
-    /**
-     * @deprecated use {@link #verify(Network, Transaction)}
-     */
-    @Deprecated
-    public static void verify(NetworkParameters params, Transaction tx) throws VerificationException {
-        verify(params.network(), tx);
     }
 }

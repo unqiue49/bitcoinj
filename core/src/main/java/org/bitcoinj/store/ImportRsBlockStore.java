@@ -327,7 +327,7 @@ public class ImportRsBlockStore implements FullPrunedBlockStore {
             System.out.println(e.getMessage());
         }
 
-        if (Script.sigHashList.isEmpty()) {
+        /*if (Script.sigHashList.isEmpty()) { // TODO commentd
             Script.sigHashList.add(Script.sigHash);
             Script.signatureList.add(Script.signature);
         }
@@ -352,7 +352,7 @@ public class ImportRsBlockStore implements FullPrunedBlockStore {
             localR.sigHash = sigHash.getBytes();
 
             cachedR.add(localR);
-        }
+        }*/
 
     }
 

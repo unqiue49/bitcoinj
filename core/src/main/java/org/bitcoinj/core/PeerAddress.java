@@ -21,7 +21,7 @@ import org.bitcoinj.base.VarInt;
 import org.bitcoinj.base.internal.Buffers;
 import org.bitcoinj.base.internal.TimeUtils;
 import org.bitcoinj.base.internal.ByteUtils;
-import org.bitcoinj.crypto.internal.TorUtils;
+import org.bitcoinj.core.internal.TorUtils;
 
 import javax.annotation.Nullable;
 import java.net.Inet4Address;
@@ -412,12 +412,6 @@ public class PeerAddress {
      */
     public Instant time() {
         return time;
-    }
-
-    /** @deprecated use {@link #time()} */
-    @Deprecated
-    public long getTime() {
-        return time.getEpochSecond();
     }
 
     @Override

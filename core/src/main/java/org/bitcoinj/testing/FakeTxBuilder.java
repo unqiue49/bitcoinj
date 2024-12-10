@@ -26,7 +26,6 @@ import org.bitcoinj.base.internal.TimeUtils;
 import org.bitcoinj.core.Block;
 import org.bitcoinj.base.Coin;
 import org.bitcoinj.crypto.ECKey;
-import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.ProtocolException;
 import org.bitcoinj.base.Sha256Hash;
 import org.bitcoinj.core.StoredBlock;
@@ -62,15 +61,6 @@ public class FakeTxBuilder {
     /** Create a fake transaction, without change. */
     public static Transaction createFakeTx(Network network) {
         return createFakeTxWithoutChangeAddress(Coin.COIN, randomAddress(network));
-    }
-
-    /**
-     * Create a fake transaction, without change.
-     * @deprecated use {@link FakeTxBuilder#createFakeTx(Network)}
-     */
-    @Deprecated
-    public static Transaction createFakeTx(final NetworkParameters params) {
-        return createFakeTxWithoutChangeAddress(Coin.COIN, randomAddress(params.network()));
     }
 
     /** Create a fake transaction, without change. */
@@ -155,16 +145,6 @@ public class FakeTxBuilder {
      */
     public static Transaction createFakeTx(Network network, Coin value, Address to) {
         return createFakeTxWithChangeAddress(value, to, randomAddress(network));
-    }
-
-    /**
-     * Create a fake TX of sufficient realism to exercise the unit tests. Two outputs, one to us, one to somewhere
-     * else to simulate change. There is one random input.
-     * @deprecated use {@link #createFakeTx(Network, Coin, Address)}
-     */
-    @Deprecated
-    public static Transaction createFakeTx(NetworkParameters params, Coin value, Address to) {
-        return createFakeTx(params.network(), value, to);
     }
 
     /**
@@ -277,13 +257,6 @@ public class FakeTxBuilder {
         return createFakeBlock(blockStore, version, time, 0, transactions);
     }
 
-    /** @deprecated use {@link #createFakeBlock(BlockStore, long, Instant, Transaction...)} */
-    @Deprecated
-    public static BlockPair createFakeBlock(BlockStore blockStore, long version,
-                                            long timeSecs, Transaction... transactions) {
-        return createFakeBlock(blockStore, version, Instant.ofEpochSecond(timeSecs), transactions);
-    }
-
     /** Emulates receiving a valid block */
     public static BlockPair createFakeBlock(BlockStore blockStore, StoredBlock previousStoredBlock, long version,
                                             Instant time, int height, Transaction... transactions) {
@@ -305,14 +278,6 @@ public class FakeTxBuilder {
         }
     }
 
-    /** @deprecated use {@link #createFakeBlock(BlockStore, StoredBlock, long, Instant, int, Transaction...)} */
-    @Deprecated
-    public static BlockPair createFakeBlock(BlockStore blockStore, StoredBlock previousStoredBlock, long version,
-                                            long timeSecs, int height, Transaction... transactions) {
-        return createFakeBlock(blockStore, previousStoredBlock, version, Instant.ofEpochSecond(timeSecs), height,
-                transactions);
-    }
-
     public static BlockPair createFakeBlock(BlockStore blockStore, StoredBlock previousStoredBlock, int height, Transaction... transactions) {
         return createFakeBlock(blockStore, previousStoredBlock, Block.BLOCK_VERSION_BIP66, TimeUtils.currentTime(), height, transactions);
     }
@@ -324,12 +289,6 @@ public class FakeTxBuilder {
         } catch (BlockStoreException e) {
             throw new RuntimeException(e);  // Cannot happen.
         }
-    }
-
-    /** @deprecated use {@link #createFakeBlock(BlockStore, long, Instant, int, Transaction...)} */
-    @Deprecated
-    public static BlockPair createFakeBlock(BlockStore blockStore, long version, long timeSecs, int height, Transaction... transactions) {
-        return createFakeBlock(blockStore, version, Instant.ofEpochSecond(timeSecs), height, transactions);
     }
 
     /** Emulates receiving a valid block that builds on top of the chain. */

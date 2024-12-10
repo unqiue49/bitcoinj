@@ -16,17 +16,15 @@
 
 package org.bitcoinj.examples;
 
-import org.bitcoinj.base.BitcoinNetwork;
-import org.bitcoinj.base.Sha256Hash;
 import org.bitcoinj.base.Address;
-import org.bitcoinj.base.Coin;
 import org.bitcoinj.base.AddressParser;
+import org.bitcoinj.base.BitcoinNetwork;
+import org.bitcoinj.base.Coin;
 import org.bitcoinj.core.Context;
 import org.bitcoinj.core.Transaction;
 import org.bitcoinj.core.TransactionBroadcast;
 import org.bitcoinj.kits.WalletAppKit;
 import org.bitcoinj.utils.BriefLogFormatter;
-import org.bitcoinj.wallet.CoinSelection;
 import org.bitcoinj.wallet.CoinSelector;
 import org.bitcoinj.wallet.SendRequest;
 import org.bitcoinj.wallet.Wallet;
@@ -37,26 +35,26 @@ import java.io.File;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
-import static java.util.stream.Collectors.collectingAndThen;
-import static java.util.stream.Collectors.toList;
-
 /**
  * ForwardingService demonstrates basic usage of bitcoinj. It creates an SPV Wallet, listens on the network
  * and when it receives coins, simply sends them onwards to the address given on the command line.
  */
 public class ForwardingService implements Closeable {
-    static final String USAGE = "Usage: address-to-forward-to [mainnet|testnet|signet|regtest]";
+    static private final String NETS = String.join("|", BitcoinNetwork.strings());
+    static final String USAGE = String.format("Usage: address-to-forward-to [%s]", NETS);
     static final int REQUIRED_CONFIRMATIONS = 1;
     static final int MAX_CONNECTIONS = 4;
     private final BitcoinNetwork network;
     private final Address forwardingAddress;
     private volatile WalletAppKit kit;
+    /* We need to save the listener object (created by a method reference) so we can remove it later */
+    private final WalletCoinsReceivedEventListener coinsReceivedListener = this::coinForwardingListener;
 
     /**
      * Run the forwarding service as a command line tool
      * @param args See {@link #USAGE}
      */
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
         // This line makes the log output more compact and easily read, especially when using the JDK log adapter.
         BriefLogFormatter.init();
         Context.propagate(new Context());
@@ -70,9 +68,7 @@ public class ForwardingService implements Closeable {
         try (ForwardingService forwardingService = new ForwardingService(args)) {
             forwardingService.run();
             // Wait for Control-C
-            try {
-                Thread.sleep(Long.MAX_VALUE);
-            } catch (InterruptedException ignored) {}
+            Thread.sleep(Long.MAX_VALUE);
         }
     }
 
@@ -82,13 +78,13 @@ public class ForwardingService implements Closeable {
      * @param args the arguments from {@link #main(String[])}
      */
     public ForwardingService(String[] args) {
+        forwardingAddress = AddressParser.getDefault().parseAddress(args[0]);
         if (args.length >= 2) {
             // If network was specified, validate address against network
             network = BitcoinNetwork.fromString(args[1]).orElseThrow();
-            forwardingAddress = AddressParser.getDefault(network).parseAddress(args[0]);
+            network.checkAddress(forwardingAddress);
         } else {
             // Else network not-specified, extract network from address
-            forwardingAddress = AddressParser.getDefault().parseAddress(args[0]);
             network = (BitcoinNetwork) forwardingAddress.network();
         }
     }
@@ -97,14 +93,14 @@ public class ForwardingService implements Closeable {
      * Start the wallet and register the coin-forwarding listener.
      */
     public void run() {
-        System.out.println("Network: " + network.id());
+        System.out.println("Network: " + network);
         System.out.println("Forwarding address: " + forwardingAddress);
 
         // Create and start the WalletKit
         kit = WalletAppKit.launch(network, new File("."), getPrefix(network), MAX_CONNECTIONS);
 
         // Add a listener that forwards received coins
-        kit.wallet().addCoinsReceivedEventListener(this::coinForwardingListener);
+        kit.wallet().addCoinsReceivedEventListener(coinsReceivedListener);
 
         // After we start listening, we can tell the user the receiving address
         System.out.printf("Waiting to receive coins on: %s\n", kit.wallet().currentReceiveAddress());
@@ -122,7 +118,7 @@ public class ForwardingService implements Closeable {
     public void close() {
         if (kit != null) {
             if (kit.isRunning()) {
-                kit.wallet().removeCoinsReceivedEventListener(this::coinForwardingListener);
+                kit.wallet().removeCoinsReceivedEventListener(coinsReceivedListener);
             }
             kit.close();
         }
@@ -162,16 +158,20 @@ public class ForwardingService implements Closeable {
     }
 
     /**
-     * Forward an incoming transaction by creating a new transaction, signing, and sending to the specified address.
+     * Forward an incoming transaction by creating a new transaction, signing, and sending to the specified address. The
+     * inputs for the new transaction should only come from the incoming transaction, so we use a custom {@link CoinSelector}
+     * that only selects wallet UTXOs with the correct parent transaction ID.
      * @param wallet The active wallet
      * @param incomingTx the received transaction
      * @param forwardingAddress the address to send to
      * @return A future for a TransactionBroadcast object that completes when relay is acknowledged by peers
      */
     private CompletableFuture<TransactionBroadcast> forward(Wallet wallet, Transaction incomingTx, Address forwardingAddress) {
-        // Send coins received in incomingTx onwards by sending exactly the outputs that have been sent to us
+        // Send coins received in incomingTx onwards by sending exactly the UTXOs we have just received.
+        // We're not truly emptying the wallet because we're limiting the available outputs with a CoinSelector.
         SendRequest sendRequest = SendRequest.emptyWallet(forwardingAddress);
-        sendRequest.coinSelector = forwardingCoinSelector(incomingTx.getTxId());
+        // Use a CoinSelector that only returns wallet UTXOs from the incoming transaction.
+        sendRequest.coinSelector = CoinSelector.fromPredicate(output -> Objects.equals(output.getParentTransactionHash(), incomingTx.getTxId()));
         System.out.printf("Creating outgoing transaction for %s...\n", forwardingAddress);
         return wallet.sendTransaction(sendRequest)
                 .thenCompose(broadcast -> {
@@ -182,18 +182,5 @@ public class ForwardingService implements Closeable {
 
     static String getPrefix(BitcoinNetwork network) {
         return String.format("forwarding-service-%s", network.toString());
-    }
-
-    /**
-     * Create a CoinSelector that only returns outputs from a given parent transaction.
-     * <p>
-     * This is using the idea of partial function application to create a 2-argument function for coin selection
-     * with a third, fixed argument of the transaction id.
-     * @param parentTxId The parent transaction hash
-     * @return a coin selector
-     */
-    static CoinSelector forwardingCoinSelector(Sha256Hash parentTxId) {
-        Objects.requireNonNull(parentTxId);
-        return CoinSelector.fromPredicate(output -> Objects.equals(output.getParentTransactionHash(), parentTxId));
     }
 }

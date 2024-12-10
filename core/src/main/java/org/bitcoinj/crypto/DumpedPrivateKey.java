@@ -44,7 +44,7 @@ public class DumpedPrivateKey extends EncodedPrivateKey {
      * @throws AddressFormatException
      *             if the given base58 doesn't parse or the checksum is invalid
      * @throws AddressFormatException.WrongNetwork
-     *             if the given private key is valid but for a different chain (eg testnet vs mainnet)
+     *             if the given private key is valid but for a different chain (e.g. testnet vs mainnet)
      */
     public static DumpedPrivateKey fromBase58(@Nullable Network network, String base58)
             throws AddressFormatException, AddressFormatException.WrongNetwork {
@@ -62,24 +62,6 @@ public class DumpedPrivateKey extends EncodedPrivateKey {
                 return new DumpedPrivateKey(network, bytes);
             throw new AddressFormatException.WrongNetwork(version);
         }
-    }
-
-    /**
-     * Construct a private key from its Base58 representation.
-     * @param params
-     *            The expected Network or null if you don't want validation.
-     * @param base58
-     *            The textual form of the private key.
-     * @throws AddressFormatException
-     *             if the given base58 doesn't parse or the checksum is invalid
-     * @throws AddressFormatException.WrongNetwork
-     *             if the given private key is valid but for a different chain (eg testnet vs mainnet)
-     * @deprecated use {@link #fromBase58(Network, String)}
-     */
-    @Deprecated
-    public static DumpedPrivateKey fromBase58(@Nullable NetworkParameters params, String base58)
-            throws AddressFormatException, AddressFormatException.WrongNetwork {
-        return fromBase58(params == null ? null : params.network(), base58);
     }
 
     private DumpedPrivateKey(Network network, byte[] bytes) {

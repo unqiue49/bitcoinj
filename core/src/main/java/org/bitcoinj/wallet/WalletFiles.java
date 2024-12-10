@@ -30,7 +30,6 @@ import java.io.IOException;
 import java.sql.Time;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Date;
 import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -103,12 +102,6 @@ public class WalletFiles {
             saveNowInternal();
             return null;
         };
-    }
-
-    /** @deprecated use {@link #WalletFiles(Wallet, File, Duration)} */
-    @Deprecated
-    public WalletFiles(final Wallet wallet, File file, long delayTime, TimeUnit timeUnit) {
-        this(wallet, file, Duration.ofMillis(timeUnit.toMillis(delayTime)));
     }
 
     /** Get the {@link Wallet} this {@link WalletFiles} is managing. */

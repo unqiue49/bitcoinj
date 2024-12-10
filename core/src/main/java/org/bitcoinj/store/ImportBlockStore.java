@@ -162,7 +162,7 @@ public class ImportBlockStore implements FullPrunedBlockStore {
                 (short)params.network().ordinal(),
                 hashBytes,
                 storedBlock.getChainWork().toByteArray(),
-                storedBlock.getHeader().cloneAsHeader().unsafeBitcoinSerialize(),
+                storedBlock.getHeader().cloneAsHeader().serialize(),
                 false);
 
         listBlocks.add(localBlock);

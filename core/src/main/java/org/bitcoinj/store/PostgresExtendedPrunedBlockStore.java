@@ -310,7 +310,7 @@ public class PostgresExtendedPrunedBlockStore implements FullPrunedBlockStore {
             s.setShort(2, (short)params.network().ordinal());
             s.setBytes(3, hashBytes);
             s.setBytes(4, storedBlock.getChainWork().toByteArray());
-            s.setBytes(5, storedBlock.getHeader().cloneAsHeader().unsafeBitcoinSerialize());
+            s.setBytes(5, storedBlock.getHeader().cloneAsHeader().serialize());
             s.setBoolean(6, wasUndoable);
             s.executeUpdate();
             s.close();
@@ -906,7 +906,7 @@ public class PostgresExtendedPrunedBlockStore implements FullPrunedBlockStore {
                 for (int i = 0; i < numTxn; i++) {
                     Transaction tx = params.getDefaultSerializer().makeTransaction(ByteBuffer.wrap(transactions)); // offset
                     transactionList.add(tx);
-                    offset += tx.getMessageSize();
+                    offset += tx.messageSize();
                 }
                 block = new StoredUndoableBlock(hash, transactionList);
             } else {

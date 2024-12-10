@@ -26,7 +26,6 @@ import org.bitcoinj.crypto.AesKey;
 import org.bitcoinj.core.BloomFilter;
 import org.bitcoinj.crypto.ECKey;
 import org.bitcoinj.base.LegacyAddress;
-import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.crypto.ChildNumber;
 import org.bitcoinj.crypto.DeterministicKey;
 import org.bitcoinj.crypto.KeyCrypter;
@@ -110,7 +109,7 @@ public class KeyChainGroup implements KeyBag {
          * <p>In the case of P2PKH, just a P2PKH chain is created and activated which is then the default chain for fresh
          * addresses. It can be upgraded to P2WPKH later.</p>
          * <p>In the case of P2WPKH, both a P2PKH and a P2WPKH chain are created and activated, the latter being the default
-         * chain. This behaviour will likely be changed with bitcoinj 0.16 such that only a P2WPKH chain is created and
+         * chain. This behaviour will likely be changed in future such that only a P2WPKH chain is created and
          * activated.</p>
          * @param outputScriptType type of addresses (aka output scripts) to generate for receiving
          */
@@ -126,7 +125,7 @@ public class KeyChainGroup implements KeyBag {
          * <p>In the case of P2PKH, just a P2PKH chain is created and activated which is then the default chain for fresh
          * addresses. It can be upgraded to P2WPKH later.</p>
          * <p>In the case of P2WPKH, both a P2PKH and a P2WPKH chain are created and activated, the latter being the default
-         * chain. This behaviour will likely be changed with bitcoinj 0.16 such that only a P2WPKH chain is created and
+         * chain. This behaviour will likely be changed in future such that only a P2WPKH chain is created and
          * activated.</p>
          * @param seed deterministic seed to derive all keys from
          * @param outputScriptType type of addresses (aka output scripts) to generate for receiving
@@ -250,30 +249,12 @@ public class KeyChainGroup implements KeyBag {
         return new KeyChainGroup(network, new BasicKeyChain(), null, -1, -1, null, null);
     }
 
-    /** @deprecated use {@link #createBasic(Network)} */
-    @Deprecated
-    public static KeyChainGroup createBasic(NetworkParameters params) {
-        return createBasic(params.network());
-    }
-
     public static KeyChainGroup.Builder builder(Network network) {
         return new Builder(network, KeyChainGroupStructure.BIP32);
     }
 
-    /** @deprecated use {@link #builder(Network)} */
-    @Deprecated
-    public static KeyChainGroup.Builder builder(NetworkParameters params) {
-        return builder(params.network());
-    }
-
     public static KeyChainGroup.Builder builder(Network network, KeyChainGroupStructure structure) {
         return new Builder(network, structure);
-    }
-
-    /** @deprecated use {@link #builder(Network, KeyChainGroupStructure)} */
-    @Deprecated
-    public static KeyChainGroup.Builder builder(NetworkParameters params, KeyChainGroupStructure structure) {
-        return builder(params.network(), structure);
     }
 
     private KeyChainGroup(Network network, @Nullable BasicKeyChain basicKeyChain,
@@ -485,7 +466,7 @@ public class KeyChainGroup implements KeyBag {
 
     /**
      * Returns the key chain that's used for generation of default fresh/current keys. This is always the newest
-     * deterministic chain. If no deterministic chain is present but imported keys instead, a deterministic upgrate is
+     * deterministic chain. If no deterministic chain is present but imported keys instead, a deterministic upgrade is
      * tried.
      */
     public final DeterministicKeyChain getActiveKeyChain() {

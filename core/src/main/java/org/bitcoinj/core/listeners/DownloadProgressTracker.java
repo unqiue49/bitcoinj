@@ -21,13 +21,11 @@ import org.bitcoinj.base.internal.TimeUtils;
 import org.bitcoinj.core.Block;
 import org.bitcoinj.core.FilteredBlock;
 import org.bitcoinj.core.Peer;
-import org.bitcoinj.utils.ListenableCompletableFuture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.time.Instant;
-import java.util.Date;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -128,7 +126,7 @@ public class DownloadProgressTracker implements BlockchainDownloadEventListener 
      * Returns a listenable future that completes with the height of the best chain (as reported by the peer) once chain
      * download seems to be finished.
      */
-    public ListenableCompletableFuture<Long> getFuture() {
-        return ListenableCompletableFuture.of(future);
+    public CompletableFuture<Long> getFuture() {
+        return future;
     }
 }

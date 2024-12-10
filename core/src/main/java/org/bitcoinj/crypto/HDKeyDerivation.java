@@ -90,7 +90,7 @@ public final class HDKeyDerivation {
     }
 
     public static DeterministicKey createMasterPubKeyFromBytes(byte[] pubKeyBytes, byte[] chainCode) {
-        return new DeterministicKey(HDPath.M(), chainCode, new LazyECPoint(ECKey.CURVE.getCurve(), pubKeyBytes), null, null);
+        return new DeterministicKey(HDPath.M(), chainCode, new LazyECPoint(pubKeyBytes), null, null);
     }
 
     /**
@@ -138,7 +138,7 @@ public final class HDKeyDerivation {
 
     /**
      * @throws HDDerivationException if private derivation is attempted for a public-only parent key, or
-     * if the resulting derived key is invalid (eg. private key == 0).
+     * if the resulting derived key is invalid (e.g. private key == 0).
      */
     public static DeterministicKey deriveChildKey(DeterministicKey parent, ChildNumber childNumber) throws HDDerivationException {
         if (!parent.hasPrivKey())
@@ -190,7 +190,7 @@ public final class HDKeyDerivation {
             PublicDeriveMode mode) throws HDDerivationException {
         RawKeyBytes rawKey = deriveChildKeyBytesFromPublic(parent, childNumber, PublicDeriveMode.NORMAL);
         return new DeterministicKey(parent.getPath().extend(childNumber), rawKey.chainCode,
-                new LazyECPoint(ECKey.CURVE.getCurve(), rawKey.keyBytes), null, parent);
+                new LazyECPoint(rawKey.keyBytes), null, parent);
     }
 
     public static RawKeyBytes deriveChildKeyBytesFromPublic(DeterministicKey parent, ChildNumber childNumber, PublicDeriveMode mode) throws HDDerivationException {

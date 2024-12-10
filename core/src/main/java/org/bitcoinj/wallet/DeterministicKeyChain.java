@@ -27,7 +27,6 @@ import org.bitcoinj.base.internal.ByteUtils;
 import org.bitcoinj.base.internal.StreamUtils;
 import org.bitcoinj.core.BloomFilter;
 import org.bitcoinj.crypto.ECKey;
-import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.base.internal.InternalUtils;
 import org.bitcoinj.crypto.ChildNumber;
 import org.bitcoinj.crypto.DeterministicHierarchy;
@@ -219,13 +218,6 @@ public class DeterministicKeyChain implements EncryptableKeyChain {
             return self();
         }
 
-        /** @deprecated use {@link #entropy(byte[], Instant)} */
-        @Deprecated
-        public T entropy(byte[] entropy, long creationTimeSecs) {
-            checkArgument(creationTimeSecs > 0);
-            return entropy(entropy, Instant.ofEpochSecond(creationTimeSecs));
-        }
-
         /**
          * Creates a deterministic key chain starting from the given seed. All keys yielded by this chain will be the same
          * if the starting seed is the same.
@@ -392,7 +384,7 @@ public class DeterministicKeyChain implements EncryptableKeyChain {
         basicKeyChain = new BasicKeyChain(crypter);
         if (!seed.isEncrypted()) {
             rootKey = HDKeyDerivation.createMasterPrivateKey(Objects.requireNonNull(seed.getSeedBytes()));
-            Optional<Instant> creationTime = seed.creationTime();
+            Optional<Instant> creationTime = seed.getCreationTime();
             if (creationTime.isPresent())
                 rootKey.setCreationTime(creationTime.get());
             else
@@ -722,8 +714,8 @@ public class DeterministicKeyChain implements EncryptableKeyChain {
     @Override
     public Instant earliestKeyCreationTime() {
         return (seed != null ?
-                seed.creationTime() :
-                getWatchingKey().creationTime()
+                seed.getCreationTime() :
+                getWatchingKey().getCreationTime()
         ).orElse(Instant.EPOCH);
     }
 
@@ -893,7 +885,7 @@ public class DeterministicKeyChain implements EncryptableKeyChain {
                     throw new UnreadableWalletException("Deterministic key missing extra data: " + key);
                 byte[] chainCode = key.getDeterministicKey().getChainCode().toByteArray();
                 // Deserialize the public key and path.
-                LazyECPoint pubkey = new LazyECPoint(ECKey.CURVE.getCurve(), key.getPublicKey().toByteArray());
+                LazyECPoint pubkey = new LazyECPoint(key.getPublicKey().toByteArray());
                 // Deserialize the path through the tree.
                 final HDPath path = HDPath.deserialize(key.getDeterministicKey().getPathList());
                 if (key.hasOutputScriptType())
@@ -1444,7 +1436,7 @@ public class DeterministicKeyChain implements EncryptableKeyChain {
                     builder.append("Seed is encrypted\n");
             }
             builder.append("Seed birthday:     ");
-            Optional<Instant> seedCreationTime = seed.creationTime();
+            Optional<Instant> seedCreationTime = seed.getCreationTime();
             if (seedCreationTime.isPresent())
                 builder.append(seedCreationTime.get().getEpochSecond()).append("  [")
                         .append(TimeUtils.dateTimeFormat(seedCreationTime.get())).append("]");
@@ -1453,7 +1445,7 @@ public class DeterministicKeyChain implements EncryptableKeyChain {
             builder.append("\n");
         } else {
             builder.append("Key birthday:      ");
-            Optional<Instant> watchingKeyCreationTime = watchingKey.creationTime();
+            Optional<Instant> watchingKeyCreationTime = watchingKey.getCreationTime();
             if (watchingKeyCreationTime.isPresent())
                 builder.append(watchingKeyCreationTime.get().getEpochSecond()).append("  [")
                         .append(TimeUtils.dateTimeFormat(watchingKeyCreationTime.get())).append("]");
@@ -1467,12 +1459,6 @@ public class DeterministicKeyChain implements EncryptableKeyChain {
         builder.append("Lookahead siz/thr: ").append(lookaheadSize).append('/').append(lookaheadThreshold).append('\n');
         formatAddresses(includeLookahead, includePrivateKeys, aesKey, network, builder);
         return builder.toString();
-    }
-
-    /** @deprecated use {@link #toString(boolean, boolean, AesKey, Network)} */
-    @Deprecated
-    public String toString(boolean includeLookahead, boolean includePrivateKeys, @Nullable AesKey aesKey, NetworkParameters params) {
-        return toString(includeLookahead, includePrivateKeys, aesKey, params.network());
     }
 
     protected void formatAddresses(boolean includeLookahead, boolean includePrivateKeys, @Nullable AesKey aesKey,
