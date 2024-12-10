@@ -1,0 +1,41 @@
+version: '3.9'
+services:
+  postgres-crypto:
+    build: .
+    image: postgres:17
+    restart: always
+    container_name: postgres-crypto
+    hostname: crypto-db
+    command: >
+      -c shared_buffers=4GB
+      -c effective_cache_size=8GB
+      -c maintenance_work_mem=1GB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c min_wal_size=64MB
+      -c max_wal_size=1GB
+      -c default_statistics_target=200
+      -c random_page_cost=1.5
+      -c effective_io_concurrency=100
+      -c work_mem=4092kB
+      -c max_parallel_maintenance_workers=12
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=P8eALlAK4TDyDWPc
+      - POSTGRES_DB=cryptodb
+      - 'POSTGRES_INITDB_ARGS=--encoding=UNICODE --lc-collate=en_US.UTF-8 --lc-ctype=en_US.UTF-8'
+      - PGDATA=/var/lib/postgresql/data
+      - USERDB=crypto
+      - USERDB_PASSWORD=btc#btc
+    shm_size: 8gb
+    ports:
+      - '5439:5432'
+    volumes:
+      - /crypto-db:/var/lib/postgresql/data
+      - ./01-init-database.sh:/docker-entrypoint-initdb.d/01-init-database.sh
+    tty: true
+    stdin_open: true
+volumes:
+  postgres:
+    driver: local
+    name: crypto-data-volume

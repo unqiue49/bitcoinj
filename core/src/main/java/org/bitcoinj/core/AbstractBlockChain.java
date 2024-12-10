@@ -482,7 +482,8 @@ public abstract class AbstractBlockChain {
      * @return The full set of all changes made to the set of open transaction outputs.
      */
     protected abstract TransactionOutputChanges connectTransactions(StoredBlock newBlock) throws VerificationException, BlockStoreException, PrunedException;    
-    
+
+    //    private static final Instant boundaryDate = Instant.parse("2008-07-03T00:00:00.00Z"); // 2016-07-03
     // filteredTxHashList contains all transactions, filteredTxn just a subset
     private boolean add(Block block, boolean tryConnecting,
                         @Nullable List<Sha256Hash> filteredTxHashList, @Nullable Map<Sha256Hash, Transaction> filteredTxn)
@@ -544,6 +545,11 @@ public abstract class AbstractBlockChain {
                 // We can't find the previous block. Probably we are still in the process of downloading the chain and a
                 // block was solved whilst we were doing it. We put it to one side and try to connect it later when we
                 // have more blocks.
+
+//                if (block.time().isBefore(boundaryDate)) {
+//                    return true;
+//                }
+
                 checkState(tryConnecting, () ->
                         "bug in tryConnectingOrphans");
                 log.warn("Block does not connect: {} prev {}", block.getHashAsString(), block.getPrevBlockHash());

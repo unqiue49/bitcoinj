@@ -67,6 +67,8 @@ public class FullPrunedBlockChain extends AbstractBlockChain {
     // Whether or not to execute scriptPubKeys before accepting a transaction (i.e. check signatures).
     private boolean runScripts = true;
 
+    private final boolean importBlockMode;
+
     /**
      * Constructs a block chain connected to the given wallet and store. To obtain a {@link Wallet} you can construct
      * one from scratch, or you can deserialize a saved wallet from disk using
@@ -92,6 +94,7 @@ public class FullPrunedBlockChain extends AbstractBlockChain {
         this.blockStore = blockStore;
         // Ignore upgrading for now
         this.chainHead = blockStore.getVerifiedChainHead();
+        this.importBlockMode = listeners.isEmpty();
     }
 
     @Override
@@ -118,6 +121,11 @@ public class FullPrunedBlockChain extends AbstractBlockChain {
     @Override
     protected boolean shouldVerifyTransactions() {
         return true;
+    }
+
+    @Override
+    protected boolean isImportBlocks() {
+        return importBlockMode;
     }
 
     /**
