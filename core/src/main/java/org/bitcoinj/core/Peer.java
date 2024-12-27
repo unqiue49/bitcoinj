@@ -277,7 +277,7 @@ public class Peer extends PeerSocketHandler {
 
     /** Registers a listener that is invoked when new blocks are downloaded. */
     public void addBlocksDownloadedEventListener(Executor executor, BlocksDownloadedEventListener listener) {
-        blocksDownloadedEventListeners.add(new ListenerRegistration(listener, executor));
+        blocksDownloadedEventListeners.add(new ListenerRegistration<>(listener, executor));
     }
 
     /** Registers a listener that is invoked when a blockchain downloaded starts. */
@@ -287,7 +287,7 @@ public class Peer extends PeerSocketHandler {
 
     /** Registers a listener that is invoked when a blockchain downloaded starts. */
     public void addChainDownloadStartedEventListener(Executor executor, ChainDownloadStartedEventListener listener) {
-        chainDownloadStartedEventListeners.add(new ListenerRegistration(listener, executor));
+        chainDownloadStartedEventListeners.add(new ListenerRegistration<>(listener, executor));
     }
 
     /** Registers a listener that is invoked when a peer is connected. */
@@ -297,7 +297,7 @@ public class Peer extends PeerSocketHandler {
 
     /** Registers a listener that is invoked when a peer is connected. */
     public void addConnectedEventListener(Executor executor, PeerConnectedEventListener listener) {
-        connectedEventListeners.add(new ListenerRegistration(listener, executor));
+        connectedEventListeners.add(new ListenerRegistration<>(listener, executor));
     }
 
     /** Registers a listener that is invoked when a peer is disconnected. */
@@ -307,7 +307,7 @@ public class Peer extends PeerSocketHandler {
 
     /** Registers a listener that is invoked when a peer is disconnected. */
     public void addDisconnectedEventListener(Executor executor, PeerDisconnectedEventListener listener) {
-        disconnectedEventListeners.add(new ListenerRegistration(listener, executor));
+        disconnectedEventListeners.add(new ListenerRegistration<>(listener, executor));
     }
 
     /** Registers a listener that is called when messages are received. */
@@ -635,7 +635,7 @@ public class Peer extends PeerSocketHandler {
         }
 
         try {
-            checkState(!downloadBlockBodies, () -> toString());
+            checkState(!downloadBlockBodies, this::toString);
             for (int i = 0; i < m.getBlockHeaders().size(); i++) {
                 Block header = m.getBlockHeaders().get(i);
                 // Process headers until we pass the fast catchup time, or are about to catch up with the head
@@ -869,7 +869,7 @@ public class Peer extends PeerSocketHandler {
                             transactions.stream()
                                     .map(tx -> downloadDependenciesInternal(tx, maxDepth, depth + 1))
                                     .collect(Collectors.toList());
-                    if (childFutures.size() == 0) {
+                    if (childFutures.isEmpty()) {
                         // Short-circuit: we're at the bottom of this part of the tree.
                         resultFuture.complete(transactions);
                     } else {
@@ -1215,7 +1215,7 @@ public class Peer extends PeerSocketHandler {
 
         lock.lock();
         try {
-            if (blocks.size() > 0 && downloadData && blockChain != null) {
+            if (!blocks.isEmpty() && downloadData && blockChain != null) {
                 // Ideally, we'd only ask for the data here if we actually needed it. However that can imply a lot of
                 // disk IO to figure out what we've got. Normally peers will not send us inv for things we already have
                 // so we just re-request it here, and if we get duplicates the block chain / wallet will filter them out.
@@ -1542,7 +1542,6 @@ public class Peer extends PeerSocketHandler {
     }
 
     protected CompletableFuture<Duration> sendPing(long nonce) {
-        final VersionMessage ver = vPeerVersionMessage;
         if (pendingPings.size() > PENDING_PINGS_LIMIT) {
             log.info("{}: Too many pending pings, disconnecting", this);
             close();
@@ -1815,8 +1814,6 @@ public class Peer extends PeerSocketHandler {
         if (clientVersion >= ProtocolVersion.BLOOM_FILTER.intValue()
                 && clientVersion < ProtocolVersion.BLOOM_FILTER_BIP111.intValue())
             return true;
-        if (version.services().has(Services.NODE_BLOOM))
-            return true;
-        return false;
+        return version.services().has(Services.NODE_BLOOM);
     }
 }

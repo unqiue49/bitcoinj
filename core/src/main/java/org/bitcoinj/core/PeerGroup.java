@@ -270,9 +270,9 @@ public class PeerGroup implements TransactionBroadcaster {
         }
     }
 
-    // Exponential backoff for peers starts at 1 second and maxes at 10 minutes.
+    // Exponential backoff for peers starts at 1 second and maxes at 1 minutes.
     private final ExponentialBackoff.Params peerBackoffParams = new ExponentialBackoff.Params(Duration.ofSeconds(1),
-            1.5f, Duration.ofMinutes(10));
+            1.25f, Duration.ofMinutes(1));
     // Tracks failures globally in case of a network failure.
     @GuardedBy("lock") private ExponentialBackoff groupBackoff = new ExponentialBackoff(new ExponentialBackoff.Params(Duration.ofSeconds(1), 1.5f, Duration.ofSeconds(10)));
 
@@ -471,7 +471,7 @@ public class PeerGroup implements TransactionBroadcaster {
         vMinRequiredProtocolVersion = ProtocolVersion.BLOOM_FILTER.intValue();
     }
 
-    private CountDownLatch executorStartupLatch = new CountDownLatch(1);
+    private final CountDownLatch executorStartupLatch = new CountDownLatch(1);
 
     protected ScheduledExecutorService createPrivateExecutor() {
         ScheduledExecutorService result =
@@ -1148,7 +1148,7 @@ public class PeerGroup implements TransactionBroadcaster {
         vUsedUp = true;
         executorStartupLatch.countDown();
         // We do blocking waits during startup, so run on the executor thread.
-        CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+        return CompletableFuture.runAsync(() -> {
             try {
                 log.info("Starting ...");
                 channels.startAsync();
@@ -1159,7 +1159,6 @@ public class PeerGroup implements TransactionBroadcaster {
                 log.error("Exception when starting up", e);  // The executor swallows exceptions :(
             }
         }, executor);
-        return future;
     }
 
     /** Does a blocking startup. */
@@ -1919,7 +1918,7 @@ public class PeerGroup implements TransactionBroadcaster {
                 if (samples == null || samples.length != period) {
                     samples = new long[period];
                     // *2 because otherwise a single low sample could cause an immediate disconnect which is too harsh.
-                    Arrays.fill(samples, minSpeedBytesPerSec * 2);
+                    Arrays.fill(samples, minSpeedBytesPerSec * 2L);
                     warmupSeconds = 15;
                 }
 
@@ -1968,7 +1967,8 @@ public class PeerGroup implements TransactionBroadcaster {
                             log.warn(String.format(Locale.US,
                                     "Chain download stalled: received %.2f KB/sec for %d seconds, require average of %.2f KB/sec, disconnecting %s, %d stalls left",
                                     average / 1024.0, samples.length, minSpeedBytesPerSec / 1024.0, peer, maxStalls));
-                            peer.close();
+                            if (peer != null)
+                                peer.close();
                             // Reset the sample buffer and give the next peer time to get going.
                             samples = null;
                             warmupSeconds = period;
