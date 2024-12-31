@@ -94,8 +94,11 @@ CREATE TABLE transactions_btc_reg_default PARTITION OF transactions_btc_reg DEFA
 
 create table transaction_outputs_open
 (
-    output_id int8 not null primary key
+    output_id int8 not null primary key,
+    hash bytea NOT null
 ) partition by range (output_id);
+
+CREATE INDEX transaction_outputs_open_hash_idx on transaction_outputs_open (hash);
 
 CREATE TABLE transaction_outputs_open_btc PARTITION OF transaction_outputs_open
     FOR VALUES FROM (288230376151711744) TO (576460752303423487) partition by range(output_id);
