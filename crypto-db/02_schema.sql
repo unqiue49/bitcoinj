@@ -53,15 +53,13 @@ insert into nets(protocol, code, name, suffix, test) values ('bitcoin','REGTEST'
 
 CREATE TYPE transaction_input AS (
     prevId int8,
-    index int2,
+    seq int4,
     script bytea,
     witness bytea
 );
 
 CREATE TYPE transaction_output AS (
     value int8,
-    index int2,
-    coinbase boolean,
     script bytea
 );
 

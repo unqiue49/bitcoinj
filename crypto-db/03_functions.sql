@@ -287,3 +287,15 @@ RETURN true;
 END;
 $BODY$
 LANGUAGE plpgsql VOLATILE COST 100;
+
+-- secret must be 32 bytes length
+CREATE OR REPLACE FUNCTION btc_generate_key(secret bytea, compressed bool = true) RETURNS bytea
+AS $$
+	import os
+	from pysecp256k1 import tagged_sha256, ec_pubkey_create, ec_pubkey_serialize
+
+	pubkey = ec_pubkey_create(secret)
+
+	return ec_pubkey_serialize(pubkey, compressed)
+$$
+LANGUAGE 'plpython3u';

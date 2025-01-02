@@ -21,12 +21,12 @@ services:
       -c max_parallel_maintenance_workers=12
     environment:
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=P8eALlAK4TDyDWPc
+      - POSTGRES_PASSWORD=***
       - POSTGRES_DB=cryptodb
       - 'POSTGRES_INITDB_ARGS=--encoding=UNICODE --lc-collate=en_US.UTF-8 --lc-ctype=en_US.UTF-8'
       - PGDATA=/var/lib/postgresql/data
       - USERDB=crypto
-      - USERDB_PASSWORD=btc#btc
+      - USERDB_PASSWORD=***
     shm_size: 8gb
     ports:
       - '5439:5432'
