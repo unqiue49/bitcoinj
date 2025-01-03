@@ -1142,9 +1142,11 @@ public class Peer extends PeerSocketHandler {
         for (InventoryItem item : items) {
             switch (item.type) {
                 case TRANSACTION:
+                case WITNESS_TRANSACTION:
                     transactions.add(item.hash);
                     break;
                 case BLOCK:
+                case WITNESS_BLOCK:
                     blocks.add(item.hash);
                     break;
                 default:
@@ -1243,7 +1245,7 @@ public class Peer extends PeerSocketHandler {
                                 getDataItems.add(new InventoryItem(InventoryItem.Type.FILTERED_BLOCK, item));
                                 pingAfterGetData = true;
                             } else {
-                                getDataItems.add(new InventoryItem(InventoryItem.Type.BLOCK, item));
+                                getDataItems.add(new InventoryItem(InventoryItem.Type.WITNESS_BLOCK, item));
                             }
                             pendingBlockDownloads.add(item);
                         }

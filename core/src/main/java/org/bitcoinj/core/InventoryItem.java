@@ -58,12 +58,12 @@ public class InventoryItem {
     }
 
     public InventoryItem(Block block) {
-        this.type = Type.BLOCK;
+        this.type = Type.WITNESS_BLOCK;
         this.hash = block.getHash();
     }
 
     public InventoryItem(Transaction tx) {
-        this.type = Type.TRANSACTION;
+        this.type = Type.WITNESS_TRANSACTION;
         this.hash = tx.getTxId();
     }
 
