@@ -93,10 +93,12 @@ CREATE TABLE transactions_btc_reg_default PARTITION OF transactions_btc_reg DEFA
 create table transaction_outputs_open
 (
     output_id int8 not null primary key,
+    script_md5 uuid not null,
     hash bytea NOT null
 ) partition by range (output_id);
 
 CREATE INDEX transaction_outputs_open_hash_idx on transaction_outputs_open (hash);
+CREATE INDEX transaction_outputs_open_script_idx on transaction_outputs_open (script_md5);
 
 CREATE TABLE transaction_outputs_open_btc PARTITION OF transaction_outputs_open
     FOR VALUES FROM (288230376151711744) TO (576460752303423487) partition by range(output_id);
@@ -117,8 +119,12 @@ CREATE TABLE transaction_outputs_open_btc_reg_default PARTITION OF transaction_o
 create table transaction_outputs_spend
 (
     input_id int8 not null primary key,
-    output_id int8 not null
+    output_id int8 not null,
+    script_md5 uuid not null
 ) partition by range (input_id);
+
+
+CREATE INDEX transaction_outputs_spend_script_idx on transaction_outputs_spend (script_md5);
 
 CREATE TABLE transaction_outputs_spend_btc PARTITION OF transaction_outputs_spend
     FOR VALUES FROM (288230376151711744) TO (576460752303423487) partition by range(input_id);

@@ -201,12 +201,12 @@ DECLARE
 begin
 	if (heigth = 0) then
 		p1 := get_block_first_transaction_index(net_id,0);
-		p2 := get_block_first_transaction_index(net_id,200000) - 1;
-		prefix := '0_200k';
+		p2 := get_block_first_transaction_index(net_id,180000) - 1;
+		prefix := '0_180k';
 	    prev_part := 0;
-	elsif (heigth < 200000) then
+	elsif (heigth < 180000) then
 		return false;
-    elsif (heigth < 300000) then
+    elsif (heigth < 260000) then
 		if (mod(heigth, 20000) = 0) then
 			p1 := get_block_first_transaction_index(net_id,heigth);
 			p2 := get_block_first_transaction_index(net_id,heigth + 20000) - 1;
@@ -217,7 +217,7 @@ begin
         else
 			return false;
         end if;
-    elsif (heigth < 300000) then
+    elsif (heigth < 260000) then
 		if (mod(heigth, 10000) = 0) then
 			p1 := get_block_first_transaction_index(net_id,heigth);
 			p2 := get_block_first_transaction_index(net_id,heigth + 10000) - 1;
@@ -237,14 +237,16 @@ begin
 			prefix := v1||'k_'||v2||'k';
 			if (heigth < 360000) then
 		    	prev_part := 2;
-			elsif (heigth < 440000) then
+			elsif (heigth < 420000) then
 				prev_part := 4;
-			elsif (heigth < 600000) then
+			elsif (heigth < 500000) then
 				prev_part := 6;
-			elsif (heigth < 700000) then
+			elsif (heigth < 600000) then
 				prev_part := 8;
-            else
+			elsif (heigth < 800000) then
 				prev_part := 10;
+            else
+				prev_part := 12;
             end if;
         else
 			return false;
@@ -288,6 +290,60 @@ END;
 $BODY$
 LANGUAGE plpgsql VOLATILE COST 100;
 
+CREATE OR REPLACE FUNCTION create_transaction_outputs_open_partition(in heigth int4, in net_id int2) returns boolean as
+$BODY$
+DECLARE
+p1 int8;
+ p2 int8;
+ p3 int8;
+ p4 int8;
+ prefix varchar;
+ net_suffix varchar;
+ main_partition varchar;
+ sub_parition varchar;
+ sub_sub_parition varchar;
+ v1 int4;
+ v2 int4;
+ prev_size int8;
+ prev_part int8;
+ calc int4;
+ step int4;
+ command varchar;
+begin
+	if (heigth = 0) then
+		p1 := get_block_first_transaction_index(net_id,0);
+		p2 := get_block_first_transaction_index(net_id,300000) - 1;
+		prefix := '0_300k';
+	    prev_part := 0;
+	elsif (heigth < 300000) then
+		return false;
+    else -- step by 100k
+		if (mod(heigth, 100000) = 0) then
+			p1 := get_block_first_transaction_index(net_id,heigth);
+			p2 := get_block_first_transaction_index(net_id,heigth + 100000) - 1;
+			v1 := (heigth/1000)::int4;
+			v2 := v1+100;
+			prefix := v1||'k_'||v2||'k';
+        else
+            return false;
+        end if;
+    end if;
+
+    select suffix into net_suffix from nets where id = net_id;
+
+    main_partition := 'transaction_outputs_open_'||net_suffix;
+	sub_parition := main_partition||'_'||prefix;
+
+
+	command := 'CREATE TABLE '||sub_parition||' PARTITION OF '||main_partition||' FOR VALUES FROM ('||p1||') TO ('||p2||')';
+    raise notice 'SQL: %', command;
+    execute command;
+
+RETURN true;
+END;
+$BODY$
+LANGUAGE plpgsql VOLATILE COST 100;
+
 -- secret must be 32 bytes length
 CREATE OR REPLACE FUNCTION btc_generate_key(secret bytea, compressed bool = true) RETURNS bytea
 AS $$
@@ -299,3 +355,32 @@ AS $$
 	return ec_pubkey_serialize(pubkey, compressed)
 $$
 LANGUAGE 'plpython3u';
+
+CREATE OR REPLACE FUNCTION get_transaction_type(in script bytea) returns varchar as
+$BODY$
+begin
+	if (get_byte(script, 0) = 118 and get_byte(script, 1) = 169 and get_byte(script, length(script) - 1) = 172) then -- x76xA9..xAC
+		return 'P2PKH';
+	elsif (get_byte(script, 0) = 169 and get_byte(script, length(script) - 1) = 135) then --xA9...x87
+		return 'P2SH';
+	elsif (get_byte(script, 0) = 65 and get_byte(script, length(script) - 1) = 172) then -- x41..xAC
+		return 'P2PK';
+	elsif (get_byte(script, 0) = 0) then -- witness
+		if (length(script) = 34) then
+			return 'P2WSH';
+		elsif (length(script) = 22) then
+			return 'P2WPKH';
+        else
+			return 'UNKNOWN';
+        end if;
+    elsif (get_byte(script, 0) = 81 and length(script) > 32) then -- taproot x51
+		return 'P2TR';
+	elsif ( get_byte(script, 0) = 106) then -- x6A
+		return 'OP_RETURN';
+    else
+		return 'UNKNOWN';
+    end if;
+END;
+$BODY$
+LANGUAGE plpgsql VOLATILE COST 100;
+end
